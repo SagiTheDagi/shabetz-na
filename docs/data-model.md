@@ -37,7 +37,7 @@
 | `shift_type` | enum | `OFFICER`, `NON_OFFICER`, `GUARD`, `COMMANDER` |
 | `is_weekend` | boolean | חמישי עד שבת = סופ"ש |
 
-> מקור הנתונים: קובץ xlsx (או אחר) שהמנהל מעלה בתחילת כל רבעון.
+> מקור הנתונים: קובץ שהמנהל מעלה בתחילת כל רבעון.
 
 ### WorkerAvailability (זמינות עובד)
 

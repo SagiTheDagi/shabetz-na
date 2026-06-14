@@ -59,7 +59,7 @@ export function ShiftTypeManager() {
       setEditingId(null);
       loadTypes();
     } else {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: "שגיאת שרת" }));
       toast.error(data.error);
     }
   }
@@ -71,7 +71,7 @@ export function ShiftTypeManager() {
       toast.success("סוג משמרת נמחק");
       loadTypes();
     } else {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: "שגיאת שרת" }));
       toast.error(data.error);
     }
   }

@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
-    "db:backup": "tsx scripts/backup.ts"
+    "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
+    "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "db:backup": "tsx --env-file=.env scripts/backup.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

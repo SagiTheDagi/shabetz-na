@@ -22,7 +22,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (e instanceof ValidationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
-    throw e;
+    console.error("PUT /api/shift-types/[shiftTypeId]:", e);
+    return NextResponse.json({ error: "שגיאה פנימית בשרת" }, { status: 500 });
   }
 }
 

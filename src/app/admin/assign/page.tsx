@@ -426,7 +426,7 @@ export default function AssignPage() {
         {/* Split panel */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Left: Shift dates */}
-          <div className="flex-[3] overflow-auto space-y-2 pe-2">
+          <div className="flex-3 overflow-auto space-y-2 pe-2">
             <h3 className="text-sm font-semibold text-muted-foreground sticky top-0 bg-background py-1">
               📋 תאריכי משמרות
             </h3>
@@ -449,7 +449,7 @@ export default function AssignPage() {
           </div>
 
           {/* Right: Workers */}
-          <div className="flex-[2] overflow-auto space-y-2 ps-2 border-s">
+          <div className="flex-2 overflow-auto space-y-2 ps-2 border-s">
             <h3 className="text-sm font-semibold text-muted-foreground sticky top-0 bg-background py-1">
               👥 עובדים{" "}
               {selectedShiftId && (

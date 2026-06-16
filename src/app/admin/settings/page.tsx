@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RankManager } from "@/components/rank-manager";
 import { ShiftTypeManager } from "@/components/shift-type-manager";
 import { EligibilityMatrix } from "@/components/eligibility-matrix";
+import { WorkerImport } from "@/components/worker-import";
 
 export default function SettingsPage() {
   return (
@@ -14,6 +15,7 @@ export default function SettingsPage() {
           <TabsTrigger value="ranks">דרגות</TabsTrigger>
           <TabsTrigger value="shift-types">סוגי משמרות</TabsTrigger>
           <TabsTrigger value="eligibility">מטריצת כשירות</TabsTrigger>
+          <TabsTrigger value="import-workers">ייבוא עובדים</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranks">
@@ -36,6 +38,14 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="pt-6">
               <EligibilityMatrix />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="import-workers">
+          <Card>
+            <CardContent className="pt-6">
+              <WorkerImport />
             </CardContent>
           </Card>
         </TabsContent>

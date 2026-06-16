@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+.env.*.local

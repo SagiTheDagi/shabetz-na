@@ -8,6 +8,8 @@ interface WorkerRow {
   is_exempt: number;
   exemption_reason: string | null;
   receives_shift_allocation: number;
+  release_date: string | null;
+  notes: string | null;
 }
 
 export async function POST(req: Request) {
@@ -27,20 +29,23 @@ export async function POST(req: Request) {
   );
 
   const insert = db.prepare(
-    `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation)
-     VALUES (?, ?, ?, 0, NULL, ?, ?, ?)`
+    `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation, release_date, notes)
+     VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)`
   );
 
   const update = db.prepare(
-    `UPDATE Worker SET name = ?, rank_id = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, updated_at = datetime('now')
+    `UPDATE Worker SET name = ?, rank_id = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, release_date = ?, notes = ?, updated_at = datetime('now')
      WHERE worker_id = ?`
   );
 
   const created: string[] = [];
   const updated: string[] = [];
+  const archived: string[] = [];
   const errors: string[] = [];
 
   const run = db.transaction(() => {
+    const importedIds = new Set<string>();
+
     for (const row of rows) {
       if (!row.worker_id || !row.name || !row.rank_id) {
         errors.push(`שורה חסרה נתונים: ${JSON.stringify(row)}`);
@@ -51,19 +56,27 @@ export async function POST(req: Request) {
         continue;
       }
 
+      importedIds.add(row.worker_id);
+
       const existing = db
         .prepare("SELECT worker_id FROM Worker WHERE worker_id = ?")
         .get(row.worker_id);
 
       if (existing) {
+        // Restore if previously archived and re-appears in file
         update.run(
           row.name,
           row.rank_id,
           row.is_exempt,
           row.exemption_reason,
           row.receives_shift_allocation,
+          row.release_date ?? null,
+          row.notes ?? null,
           row.worker_id
         );
+        db.prepare(
+          "UPDATE Worker SET is_archived = 0, updated_at = datetime('now') WHERE worker_id = ? AND is_archived = 1"
+        ).run(row.worker_id);
         updated.push(row.worker_id);
       } else {
         insert.run(
@@ -72,14 +85,30 @@ export async function POST(req: Request) {
           row.rank_id,
           row.is_exempt,
           row.exemption_reason,
-          row.receives_shift_allocation
+          row.receives_shift_allocation,
+          row.release_date ?? null,
+          row.notes ?? null
         );
         created.push(row.worker_id);
+      }
+    }
+
+    // Archive active workers not present in the import file
+    const activeWorkers = db
+      .prepare("SELECT worker_id FROM Worker WHERE is_archived = 0 AND is_admin = 0")
+      .all() as { worker_id: string }[];
+
+    for (const { worker_id } of activeWorkers) {
+      if (!importedIds.has(worker_id)) {
+        db.prepare(
+          "UPDATE Worker SET is_archived = 1, updated_at = datetime('now') WHERE worker_id = ?"
+        ).run(worker_id);
+        archived.push(worker_id);
       }
     }
   });
 
   run();
 
-  return NextResponse.json({ created: created.length, updated: updated.length, errors });
+  return NextResponse.json({ created: created.length, updated: updated.length, archived: archived.length, errors });
 }

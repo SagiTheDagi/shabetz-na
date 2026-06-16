@@ -148,6 +148,7 @@ export function getSortedWorkers(shiftDateId: string): {
       `SELECT w.*, r.name as rank_name
        FROM Worker w
        JOIN Rank r ON r.rank_id = w.rank_id
+       WHERE w.is_archived = 0
        ORDER BY r.display_order, w.name`
     )
     .all() as (Worker & { rank_name: string })[];

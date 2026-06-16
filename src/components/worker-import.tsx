@@ -15,6 +15,8 @@ interface ParsedWorker {
   is_exempt: number;
   exemption_reason: string | null;
   receives_shift_allocation: number;
+  release_date: string | null;
+  notes: string | null;
 }
 
 // Raw row from the xlsx before rank mapping
@@ -25,9 +27,22 @@ interface RawWorker {
   is_exempt: number;
   exemption_reason: string | null;
   receives_shift_allocation: number;
+  release_date: string | null;
+  notes: string | null;
 }
 
 // ── xlsx parser ───────────────────────────────────────────────
+
+function excelDateToIso(serial: unknown): string | null {
+  if (serial == null || serial === "") return null;
+  const n = Number(serial);
+  if (isNaN(n) || n < 1) return null;
+  // Excel serial: days since Dec 30 1899 (accounting for the 1900 leap-year bug)
+  const ms = (n - 25569) * 86400 * 1000;
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
 
 function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: string[] } {
   const wb = XLSX.read(buffer, { type: "array" });
@@ -47,8 +62,9 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
     const file_rank = r[1];
     const last_name = r[2];
     const first_name = r[3];
-    const notes = r[9];
-    const eligibility = r[10];
+    const release_date_raw = r[5];
+    const notes = r[10];      // הערות
+    const eligibility = r[11]; // כשירות
 
     if (worker_id == null || worker_id === "") continue;
 
@@ -59,8 +75,10 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
 
     const eligStr = String(eligibility ?? "").trim();
     const is_exempt = eligStr === "לא כשיר" ? 1 : 0;
-    const exemption_reason =
-      is_exempt && notes ? String(notes).trim() : null;
+    const notesStr = notes ? String(notes).trim() : null;
+    // For exempt workers הערות explains the exemption; for others it's a general note
+    const exemption_reason = is_exempt ? notesStr : null;
+    const worker_notes = is_exempt ? null : notesStr;
 
     workers.push({
       worker_id: String(worker_id),
@@ -69,6 +87,8 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
       is_exempt,
       exemption_reason,
       receives_shift_allocation: 1,
+      release_date: excelDateToIso(release_date_raw),
+      notes: worker_notes,
     });
   }
 
@@ -118,6 +138,8 @@ function parseCsvWorkers(
       is_exempt,
       exemption_reason,
       receives_shift_allocation,
+      release_date: null,
+      notes: null,
     });
   }
 
@@ -203,7 +225,14 @@ export function WorkerImport() {
 
     const data = await res.json();
     if (res.ok) {
-      toast.success(`יובאו ${data.created} עובדים חדשים, עודכנו ${data.updated}`);
+      // Also run release-date auto-archive now that release_dates are fresh
+      const autoRes = await fetch("/api/workers/auto-archive", { method: "POST" });
+      const autoData = autoRes.ok ? await autoRes.json() : { archived: 0 };
+
+      const parts = [`יובאו ${data.created} חדשים, עודכנו ${data.updated}`];
+      const totalArchived = (data.archived ?? 0) + (autoData.archived ?? 0);
+      if (totalArchived > 0) parts.push(`הועברו לארכיון ${totalArchived}`);
+      toast.success(parts.join(" — "));
       if (data.errors?.length > 0) toast.warning(`${data.errors.length} שגיאות: ${data.errors[0]}`);
       setParsed([]);
     } else {

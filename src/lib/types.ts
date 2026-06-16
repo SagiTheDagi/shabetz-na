@@ -27,6 +27,10 @@ export interface Worker {
   is_exempt: number;
   exemption_reason: string | null;
   receives_shift_allocation: number;
+  standing_constraints: string | null;
+  notes: string | null;
+  release_date: string | null;
+  is_archived: number;
   created_at: string;
   updated_at: string;
 }

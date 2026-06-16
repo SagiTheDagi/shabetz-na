@@ -56,22 +56,77 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const { workerId } = await params;
+    const body = await req.json();
+    const db = getDb();
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if ("is_exempt" in body) {
+      const exempt = validateBoolean(body.is_exempt);
+      fields.push("is_exempt = ?");
+      values.push(exempt);
+      if (exempt) {
+        const reason = validateString(body.exemption_reason, "סיבת פטור", 500);
+        fields.push("exemption_reason = ?");
+        values.push(reason);
+      } else {
+        fields.push("exemption_reason = ?");
+        values.push(null);
+      }
+    }
+    if ("receives_shift_allocation" in body) {
+      fields.push("receives_shift_allocation = ?");
+      values.push(validateBoolean(body.receives_shift_allocation));
+    }
+    if ("notes" in body) {
+      fields.push("notes = ?");
+      values.push(body.notes ?? null);
+    }
+    if ("standing_constraints" in body) {
+      fields.push("standing_constraints = ?");
+      values.push(body.standing_constraints ?? null);
+    }
+    if ("is_archived" in body) {
+      fields.push("is_archived = ?");
+      values.push(validateBoolean(body.is_archived) ? 1 : 0);
+    }
+
+    if (fields.length === 0) {
+      return NextResponse.json({ error: "אין שדות לעדכון" }, { status: 400 });
+    }
+
+    fields.push("updated_at = datetime('now')");
+    values.push(workerId);
+
+    const result = db
+      .prepare(`UPDATE Worker SET ${fields.join(", ")} WHERE worker_id = ?`)
+      .run(...values);
+
+    if (result.changes === 0) {
+      return NextResponse.json({ error: "עובד לא נמצא" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    throw e;
+  }
+}
+
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { workerId } = await params;
   const db = getDb();
 
-  const assignmentCount = db.prepare(
-    "SELECT COUNT(*) as count FROM ShiftAssignment WHERE worker_id = ?"
-  ).get(workerId) as { count: number };
+  const result = db.prepare(
+    "UPDATE Worker SET is_archived = 1, updated_at = datetime('now') WHERE worker_id = ?"
+  ).run(workerId);
 
-  if (assignmentCount.count > 0) {
-    return NextResponse.json(
-      { error: `לא ניתן למחוק — לעובד ${assignmentCount.count} שיבוצים` },
-      { status: 409 }
-    );
-  }
-
-  const result = db.prepare("DELETE FROM Worker WHERE worker_id = ?").run(workerId);
   if (result.changes === 0) {
     return NextResponse.json({ error: "עובד לא נמצא" }, { status: 404 });
   }

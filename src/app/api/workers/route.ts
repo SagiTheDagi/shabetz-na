@@ -6,15 +6,18 @@ import { validateString, validateOptionalString, validateBoolean, ValidationErro
 export async function GET(req: NextRequest) {
   const db = getDb();
   const includeExempt = req.nextUrl.searchParams.get("include_exempt") === "true";
+  const includeArchived = req.nextUrl.searchParams.get("include_archived") === "true";
+
+  const conditions: string[] = [];
+  if (!includeArchived) conditions.push("w.is_archived = 0");
+  if (!includeExempt) conditions.push("w.is_exempt = 0");
 
   let query = `
     SELECT w.*, r.name as rank_name
     FROM Worker w
     JOIN Rank r ON r.rank_id = w.rank_id
   `;
-  if (!includeExempt) {
-    query += " WHERE w.is_exempt = 0";
-  }
+  if (conditions.length > 0) query += ` WHERE ${conditions.join(" AND ")}`;
   query += " ORDER BY r.display_order, w.name";
 
   const workers = db.prepare(query).all();

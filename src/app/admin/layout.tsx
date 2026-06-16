@@ -9,7 +9,6 @@ import type { SessionPayload } from "@/lib/types";
 
 const navItems = [
   { href: "/admin", label: "ראשי", icon: "📊" },
-  { href: "/admin/upload", label: "העלאת תאריכים", icon: "📤" },
   { href: "/admin/assign", label: "שיבוץ", icon: "📋" },
   { href: "/admin/settings", label: "הגדרות", icon: "⚙️" },
 ];

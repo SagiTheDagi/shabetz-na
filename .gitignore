@@ -31,5 +31,8 @@ Thumbs.db
 # AI
 /.claude
 CLAUDE.md
-/docs/business-rules.md
-/docs/ranks-and-shifts.md
+docs/business-rules.md
+docs/ranks-and-shifts.md
+/docs
+docs/
+docs/business-rules.md

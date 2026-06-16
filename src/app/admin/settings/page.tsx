@@ -6,17 +6,46 @@ import { RankManager } from "@/components/rank-manager";
 import { ShiftTypeManager } from "@/components/shift-type-manager";
 import { EligibilityMatrix } from "@/components/eligibility-matrix";
 import { WorkerImport } from "@/components/worker-import";
+import { WorkerManagement } from "@/components/worker-management";
+import { ShiftDateImport } from "@/components/shift-date-import";
+import { FormResponseImport } from "@/components/form-response-import";
 
 export default function SettingsPage() {
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="eligibility" dir="rtl">
+      <Tabs defaultValue="shift-dates" dir="rtl">
         <TabsList>
+          <TabsTrigger value="workers">עובדים</TabsTrigger>
+          <TabsTrigger value="form-responses">ייבוא אילוצים</TabsTrigger>
+          <TabsTrigger value="shift-dates">תאריכי משמרות</TabsTrigger>
           <TabsTrigger value="ranks">דרגות</TabsTrigger>
           <TabsTrigger value="shift-types">סוגי משמרות</TabsTrigger>
           <TabsTrigger value="eligibility">מטריצת כשירות</TabsTrigger>
-          <TabsTrigger value="import-workers">ייבוא עובדים</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workers">
+          <Card>
+            <CardContent className="pt-6 space-y-8">
+              <WorkerManagement />
+              <div className="border-t pt-6">
+                <p className="text-sm font-medium mb-4">ייבוא עובדים מקובץ</p>
+                <WorkerImport />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="form-responses">
+          <Card>
+            <CardContent className="pt-6">
+              <FormResponseImport />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shift-dates">
+          <ShiftDateImport />
+        </TabsContent>
 
         <TabsContent value="ranks">
           <Card>
@@ -38,14 +67,6 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="pt-6">
               <EligibilityMatrix />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="import-workers">
-          <Card>
-            <CardContent className="pt-6">
-              <WorkerImport />
             </CardContent>
           </Card>
         </TabsContent>

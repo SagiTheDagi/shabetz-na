@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const db = getDb();
   const worker = db
-    .prepare("SELECT * FROM Worker WHERE worker_id = ?")
+    .prepare("SELECT * FROM Worker WHERE worker_id = ? AND is_archived = 0")
     .get(worker_id) as Worker | undefined;
 
   if (!worker) {

@@ -109,5 +109,20 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_history_quarter ON ShiftHistory(quarter_id);
 `);
 
-console.log("Migration complete. All tables created.");
+// Add new Worker columns — safe to re-run, skips if column already exists
+for (const sql of [
+  "ALTER TABLE Worker ADD COLUMN standing_constraints TEXT",
+  "ALTER TABLE Worker ADD COLUMN notes TEXT",
+  "ALTER TABLE Worker ADD COLUMN release_date TEXT",
+  "ALTER TABLE Worker ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0",
+]) {
+  try {
+    db.exec(sql);
+    console.log(`Column added: ${sql}`);
+  } catch {
+    // column already exists
+  }
+}
+
+console.log("Migration complete.");
 db.close();

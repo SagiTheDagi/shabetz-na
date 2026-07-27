@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
-import { validateString, validateBoolean, ValidationError } from "@/lib/validation";
+import { validateString, validateOptionalString, validateBoolean, ValidationError } from "@/lib/validation";
 
 type Params = { params: Promise<{ workerId: string }> };
 
@@ -17,6 +17,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ? validateString(body.exemption_reason, "סיבת פטור", 500)
       : null;
     const receives_shift_allocation = validateBoolean(body.receives_shift_allocation ?? true);
+    const branch = validateOptionalString(body.branch, "ענף", 100);
+    const team = validateOptionalString(body.team, "צוות", 100);
 
     const db = getDb();
 
@@ -26,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     let password_hash_update = "";
-    const values: unknown[] = [name, rank_id, is_admin, is_exempt, exemption_reason, receives_shift_allocation];
+    const values: unknown[] = [name, rank_id, is_admin, is_exempt, exemption_reason, receives_shift_allocation, branch, team];
 
     if (is_admin && body.password) {
       const hash = await hashPassword(body.password);
@@ -37,7 +39,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     values.push(workerId);
 
     const result = db.prepare(
-      `UPDATE Worker SET name = ?, rank_id = ?, is_admin = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, updated_at = datetime('now')${password_hash_update} WHERE worker_id = ?`
+      `UPDATE Worker SET name = ?, rank_id = ?, is_admin = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, branch = ?, team = ?, updated_at = datetime('now')${password_hash_update} WHERE worker_id = ?`
     ).run(...values);
 
     if (result.changes === 0) {
@@ -93,6 +95,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if ("is_archived" in body) {
       fields.push("is_archived = ?");
       values.push(validateBoolean(body.is_archived) ? 1 : 0);
+    }
+    if ("branch" in body) {
+      fields.push("branch = ?");
+      values.push(body.branch ?? null);
+    }
+    if ("team" in body) {
+      fields.push("team = ?");
+      values.push(body.team ?? null);
     }
 
     if (fields.length === 0) {

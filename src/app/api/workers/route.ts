@@ -36,6 +36,8 @@ export async function POST(req: Request) {
       ? validateString(body.exemption_reason, "סיבת פטור", 500)
       : null;
     const receives_shift_allocation = validateBoolean(body.receives_shift_allocation ?? true);
+    const branch = validateOptionalString(body.branch, "ענף", 100);
+    const team = validateOptionalString(body.team, "צוות", 100);
 
     const db = getDb();
 
@@ -55,9 +57,9 @@ export async function POST(req: Request) {
     }
 
     db.prepare(
-      `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation);
+      `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation, branch, team)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation, branch, team);
 
     const created = db.prepare(
       "SELECT w.*, r.name as rank_name FROM Worker w JOIN Rank r ON r.rank_id = w.rank_id WHERE w.worker_id = ?"

@@ -109,12 +109,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_history_quarter ON ShiftHistory(quarter_id);
 `);
 
-// Add new Worker columns — safe to re-run, skips if column already exists
+// Add new columns — safe to re-run, skips if column already exists
 for (const sql of [
   "ALTER TABLE Worker ADD COLUMN standing_constraints TEXT",
   "ALTER TABLE Worker ADD COLUMN notes TEXT",
   "ALTER TABLE Worker ADD COLUMN release_date TEXT",
   "ALTER TABLE Worker ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE Worker ADD COLUMN branch TEXT",
+  "ALTER TABLE Worker ADD COLUMN team TEXT",
+  "ALTER TABLE ShiftAssignment ADD COLUMN role TEXT NOT NULL DEFAULT 'shift'",
 ]) {
   try {
     db.exec(sql);
@@ -122,6 +125,14 @@ for (const sql of [
   } catch {
     // column already exists
   }
+}
+
+// Add unique index on (shift_date_id, role) now that the role column exists
+try {
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_shift_role ON ShiftAssignment(shift_date_id, role)");
+  console.log("Unique index on ShiftAssignment(shift_date_id, role) ensured.");
+} catch {
+  // index already exists or other non-fatal error
 }
 
 console.log("Migration complete.");

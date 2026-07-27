@@ -5,13 +5,12 @@ import type {
   ShiftDate,
   WorkerAvailability,
   RankShiftEligibility,
-  ShiftAssignment,
-  ShiftHistory,
 } from "./types";
 
 export function getWorkerWarnings(
   workerId: string,
-  shiftDateId: string
+  shiftDateId: string,
+  role: "shift" | "reserve" = "shift"
 ): AssignmentWarning[] {
   const db = getDb();
   const warnings: AssignmentWarning[] = [];
@@ -75,12 +74,12 @@ export function getWorkerWarnings(
     });
   }
 
-  // Check already assigned this quarter
+  // Check already assigned this quarter (reserve does not count as a shift)
   const existingAssignment = db
     .prepare(
       `SELECT sa.assignment_id FROM ShiftAssignment sa
        JOIN ShiftDate sd ON sd.shift_date_id = sa.shift_date_id
-       WHERE sa.worker_id = ? AND sd.quarter_id = ?`
+       WHERE sa.worker_id = ? AND sd.quarter_id = ? AND sa.role = 'shift'`
     )
     .get(workerId, shiftDate.quarter_id) as
     | { assignment_id: string }
@@ -94,8 +93,8 @@ export function getWorkerWarnings(
     });
   }
 
-  // Check weekend limit (max 1 per year)
-  if (shiftDate.is_weekend) {
+  // Check weekend limit (max 1 per year) — GUARD shifts are exempt from this rule
+  if (shiftDate.is_weekend && shiftDate.shift_type_id !== "GUARD") {
     const year = shiftDate.date.substring(0, 4);
     const weekendCount = db
       .prepare(
@@ -114,15 +113,45 @@ export function getWorkerWarnings(
     }
   }
 
+  // Check same-branch constraint: both workers on a shift must share a branch
+  const otherRole = role === "shift" ? "reserve" : "shift";
+  const otherWorker = db
+    .prepare(
+      `SELECT w.branch FROM ShiftAssignment sa
+       JOIN Worker w ON w.worker_id = sa.worker_id
+       WHERE sa.shift_date_id = ? AND sa.role = ?`
+    )
+    .get(shiftDateId, otherRole) as { branch: string | null } | undefined;
+
+  if (
+    otherWorker &&
+    otherWorker.branch !== null &&
+    worker.branch !== null &&
+    otherWorker.branch !== worker.branch
+  ) {
+    warnings.push({
+      type: "branch_mismatch",
+      severity: "amber",
+      message: `ענף שונה מהעובד ה${role === "reserve" ? "משמרת" : "רזרבה"} (${worker.branch} ≠ ${otherWorker.branch})`,
+    });
+  }
+
   return warnings;
 }
 
-export function getSortedWorkers(shiftDateId: string): {
+export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" = "shift"): {
   worker_id: string;
   name: string;
   rank_id: string;
   rank_name: string;
   is_exempt: number;
+  exemption_reason: string | null;
+  receives_shift_allocation: number;
+  branch: string | null;
+  team: string | null;
+  standing_constraints: string | null;
+  notes: string | null;
+  release_date: string | null;
   warnings: AssignmentWarning[];
   days_since_last_shift: number | null;
   assigned_this_quarter: boolean;
@@ -154,7 +183,7 @@ export function getSortedWorkers(shiftDateId: string): {
     .all() as (Worker & { rank_name: string })[];
 
   const results = workers.map((worker) => {
-    const warnings = getWorkerWarnings(worker.worker_id, shiftDateId);
+    const warnings = getWorkerWarnings(worker.worker_id, shiftDateId, role);
 
     // Eligibility
     const elig = db
@@ -174,12 +203,12 @@ export function getSortedWorkers(shiftDateId: string): {
       | { status: string }
       | undefined;
 
-    // Already assigned this quarter
+    // Already assigned this quarter (reserve does not count as a shift)
     const assigned = db
       .prepare(
         `SELECT sa.assignment_id FROM ShiftAssignment sa
          JOIN ShiftDate sd ON sd.shift_date_id = sa.shift_date_id
-         WHERE sa.worker_id = ? AND sd.quarter_id = ?`
+         WHERE sa.worker_id = ? AND sd.quarter_id = ? AND sa.role = 'shift'`
       )
       .get(worker.worker_id, shiftDate.quarter_id) as
       | { assignment_id: string }
@@ -210,6 +239,13 @@ export function getSortedWorkers(shiftDateId: string): {
       rank_id: worker.rank_id,
       rank_name: worker.rank_name,
       is_exempt: worker.is_exempt,
+      exemption_reason: worker.exemption_reason,
+      receives_shift_allocation: worker.receives_shift_allocation,
+      branch: worker.branch,
+      team: worker.team,
+      standing_constraints: worker.standing_constraints,
+      notes: worker.notes,
+      release_date: worker.release_date,
       warnings,
       days_since_last_shift: daysSince,
       assigned_this_quarter: !!assigned,

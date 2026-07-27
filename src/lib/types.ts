@@ -31,6 +31,8 @@ export interface Worker {
   notes: string | null;
   release_date: string | null;
   is_archived: number;
+  branch: string | null;
+  team: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +69,7 @@ export interface ShiftAssignment {
   is_forced: number;
   force_reason: string | null;
   assigned_at: string;
+  role: "shift" | "reserve";
 }
 
 export interface ShiftHistory {
@@ -101,6 +104,10 @@ export interface ShiftDateWithAssignment extends ShiftDateWithType {
   assigned_worker_id: string | null;
   assigned_worker_name: string | null;
   is_forced: number | null;
+  reserve_assignment_id: string | null;
+  reserve_worker_id: string | null;
+  reserve_worker_name: string | null;
+  reserve_is_forced: number | null;
 }
 
 export interface WorkerSuggestion extends WorkerWithRank {
@@ -126,6 +133,7 @@ export interface ExportData {
     is_forced: boolean;
     force_reason: string | null;
     assigned_at: string;
+    role: "shift" | "reserve";
   }[];
   worker_availability: {
     worker_id: string;

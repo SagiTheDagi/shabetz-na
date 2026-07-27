@@ -10,6 +10,8 @@ interface WorkerRow {
   receives_shift_allocation: number;
   release_date: string | null;
   notes: string | null;
+  branch: string | null;
+  team: string | null;
 }
 
 export async function POST(req: Request) {
@@ -29,12 +31,12 @@ export async function POST(req: Request) {
   );
 
   const insert = db.prepare(
-    `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation, release_date, notes)
-     VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)`
+    `INSERT INTO Worker (worker_id, name, rank_id, is_admin, password_hash, is_exempt, exemption_reason, receives_shift_allocation, release_date, notes, branch, team)
+     VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const update = db.prepare(
-    `UPDATE Worker SET name = ?, rank_id = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, release_date = ?, notes = ?, updated_at = datetime('now')
+    `UPDATE Worker SET name = ?, rank_id = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, release_date = ?, notes = ?, branch = ?, team = ?, updated_at = datetime('now')
      WHERE worker_id = ?`
   );
 
@@ -72,6 +74,8 @@ export async function POST(req: Request) {
           row.receives_shift_allocation,
           row.release_date ?? null,
           row.notes ?? null,
+          row.branch ?? null,
+          row.team ?? null,
           row.worker_id
         );
         db.prepare(
@@ -87,7 +91,9 @@ export async function POST(req: Request) {
           row.exemption_reason,
           row.receives_shift_allocation,
           row.release_date ?? null,
-          row.notes ?? null
+          row.notes ?? null,
+          row.branch ?? null,
+          row.team ?? null
         );
         created.push(row.worker_id);
       }

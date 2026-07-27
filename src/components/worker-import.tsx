@@ -17,6 +17,8 @@ interface ParsedWorker {
   receives_shift_allocation: number;
   release_date: string | null;
   notes: string | null;
+  branch: string | null;
+  team: string | null;
 }
 
 // Raw row from the xlsx before rank mapping
@@ -29,6 +31,8 @@ interface RawWorker {
   receives_shift_allocation: number;
   release_date: string | null;
   notes: string | null;
+  branch: string | null;
+  team: string | null;
 }
 
 // ── xlsx parser ───────────────────────────────────────────────
@@ -89,6 +93,8 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
       receives_shift_allocation: 1,
       release_date: excelDateToIso(release_date_raw),
       notes: worker_notes,
+      branch: null,
+      team: null,
     });
   }
 
@@ -140,6 +146,8 @@ function parseCsvWorkers(
       receives_shift_allocation,
       release_date: null,
       notes: null,
+      branch: null,
+      team: null,
     });
   }
 

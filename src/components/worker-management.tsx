@@ -15,6 +15,8 @@ interface EditState {
   receives_shift_allocation: boolean;
   standing_constraints: string;
   notes: string;
+  branch: string;
+  team: string;
 }
 
 function toEditState(w: WorkerWithRank): EditState {
@@ -24,6 +26,8 @@ function toEditState(w: WorkerWithRank): EditState {
     receives_shift_allocation: w.receives_shift_allocation !== 0,
     standing_constraints: w.standing_constraints ?? "",
     notes: w.notes ?? "",
+    branch: w.branch ?? "",
+    team: w.team ?? "",
   };
 }
 
@@ -87,6 +91,8 @@ export function WorkerManagement() {
         receives_shift_allocation: edit.receives_shift_allocation,
         standing_constraints: edit.standing_constraints.trim() || null,
         notes: edit.notes.trim() || null,
+        branch: edit.branch.trim() || null,
+        team: edit.team.trim() || null,
       }),
     });
 
@@ -148,7 +154,9 @@ export function WorkerManagement() {
     (w) =>
       w.name.includes(search) ||
       w.worker_id.includes(search) ||
-      w.rank_name.includes(search)
+      w.rank_name.includes(search) ||
+      (w.branch ?? "").includes(search) ||
+      (w.team ?? "").includes(search)
   );
 
   const isDirty =
@@ -188,6 +196,8 @@ export function WorkerManagement() {
                 <div className="text-xs text-muted-foreground flex gap-2">
                   <span>{w.rank_name}</span>
                   <span className="font-mono">{w.worker_id}</span>
+                  {w.branch && <span>{w.branch}</span>}
+                  {w.team && <span>{w.team}</span>}
                 </div>
                 {w.notes && (
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 opacity-70">
@@ -256,6 +266,30 @@ export function WorkerManagement() {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Branch and team */}
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="branch" className="text-sm font-medium">ענף</Label>
+                <Input
+                  id="branch"
+                  value={edit.branch}
+                  onChange={(e) => setEdit({ ...edit, branch: e.target.value })}
+                  placeholder="שם הענף..."
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="team" className="text-sm font-medium">צוות</Label>
+                <Input
+                  id="team"
+                  value={edit.team}
+                  onChange={(e) => setEdit({ ...edit, team: e.target.value })}
+                  placeholder="שם הצוות..."
+                  className="text-sm"
+                />
+              </div>
             </div>
 
             {/* Standing constraints */}

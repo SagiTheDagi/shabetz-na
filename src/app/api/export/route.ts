@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const assignments = db
     .prepare(
-      `SELECT sa.shift_date_id, sa.worker_id, sa.is_forced, sa.force_reason, sa.assigned_at
+      `SELECT sa.shift_date_id, sa.worker_id, sa.is_forced, sa.force_reason, sa.assigned_at, sa.role
        FROM ShiftAssignment sa
        JOIN ShiftDate sd ON sd.shift_date_id = sa.shift_date_id
        WHERE sd.quarter_id = ?`
@@ -40,16 +40,17 @@ export async function GET(req: NextRequest) {
     .all(quarterId);
 
   const exportData: ExportData = {
-    version: 2,
+    version: 3,
     exported_at: new Date().toISOString(),
     ranks: ranks as ExportData["ranks"],
     shift_types: shift_types as ExportData["shift_types"],
     eligibility: eligibility as ExportData["eligibility"],
     quarter: quarter as ExportData["quarter"],
     shift_dates: shift_dates as ExportData["shift_dates"],
-    assignments: (assignments as { shift_date_id: string; worker_id: string; is_forced: number; force_reason: string | null; assigned_at: string }[]).map((a) => ({
+    assignments: (assignments as { shift_date_id: string; worker_id: string; is_forced: number; force_reason: string | null; assigned_at: string; role: "shift" | "reserve" }[]).map((a) => ({
       ...a,
       is_forced: !!a.is_forced,
+      role: a.role ?? "shift",
     })),
     worker_availability: worker_availability as ExportData["worker_availability"],
   };
@@ -69,37 +70,27 @@ export async function POST(req: Request) {
   const importAll = db.transaction(() => {
     const q = data.quarter;
 
-    // Upsert quarter
     db.prepare(
       `INSERT OR REPLACE INTO Quarter (quarter_id, start_date, end_date, status)
        VALUES (?, ?, ?, ?)`
     ).run(q.quarter_id, q.start_date, q.end_date, q.status);
 
-    // Clear existing shift dates and assignments for this quarter
     db.prepare(
       "DELETE FROM ShiftAssignment WHERE shift_date_id IN (SELECT shift_date_id FROM ShiftDate WHERE quarter_id = ?)"
     ).run(q.quarter_id);
     db.prepare("DELETE FROM ShiftDate WHERE quarter_id = ?").run(q.quarter_id);
     db.prepare("DELETE FROM WorkerAvailability WHERE quarter_id = ?").run(q.quarter_id);
 
-    // Import shift dates
     const insertShiftDate = db.prepare(
       "INSERT INTO ShiftDate (shift_date_id, quarter_id, date, shift_type_id, is_weekend) VALUES (?, ?, ?, ?, ?)"
     );
     for (const sd of data.shift_dates) {
-      insertShiftDate.run(
-        sd.shift_date_id,
-        q.quarter_id,
-        sd.date,
-        sd.shift_type_id,
-        sd.is_weekend ? 1 : 0
-      );
+      insertShiftDate.run(sd.shift_date_id, q.quarter_id, sd.date, sd.shift_type_id, sd.is_weekend ? 1 : 0);
     }
 
-    // Import assignments
     const insertAssignment = db.prepare(
-      `INSERT INTO ShiftAssignment (assignment_id, shift_date_id, worker_id, assigned_by, is_forced, force_reason, assigned_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO ShiftAssignment (assignment_id, shift_date_id, worker_id, assigned_by, is_forced, force_reason, assigned_at, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const a of data.assignments) {
       insertAssignment.run(
@@ -109,11 +100,11 @@ export async function POST(req: Request) {
         "import",
         a.is_forced ? 1 : 0,
         a.force_reason,
-        a.assigned_at
+        a.assigned_at,
+        a.role ?? "shift"
       );
     }
 
-    // Import availability
     const insertAvail = db.prepare(
       "INSERT INTO WorkerAvailability (availability_id, worker_id, quarter_id, date, status) VALUES (?, ?, ?, ?, ?)"
     );

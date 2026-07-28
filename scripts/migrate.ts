@@ -107,6 +107,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_assignment_worker ON ShiftAssignment(worker_id);
   CREATE INDEX IF NOT EXISTS idx_history_worker ON ShiftHistory(worker_id);
   CREATE INDEX IF NOT EXISTS idx_history_quarter ON ShiftHistory(quarter_id);
+
+  CREATE TABLE IF NOT EXISTS JusticeChart (
+    worker_id TEXT NOT NULL REFERENCES Worker(worker_id) ON DELETE CASCADE,
+    shift_type_id TEXT NOT NULL REFERENCES ShiftType(shift_type_id) ON DELETE CASCADE,
+    total_shifts INTEGER NOT NULL DEFAULT 0,
+    weekend_shifts INTEGER NOT NULL DEFAULT 0,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (worker_id, shift_type_id)
+  );
 `);
 
 // Add new columns — safe to re-run, skips if column already exists
@@ -118,6 +129,7 @@ for (const sql of [
   "ALTER TABLE Worker ADD COLUMN branch TEXT",
   "ALTER TABLE Worker ADD COLUMN team TEXT",
   "ALTER TABLE ShiftAssignment ADD COLUMN role TEXT NOT NULL DEFAULT 'shift'",
+  "ALTER TABLE JusticeChart ADD COLUMN weekend_shifts INTEGER NOT NULL DEFAULT 0",
 ]) {
   try {
     db.exec(sql);
@@ -133,6 +145,30 @@ try {
   console.log("Unique index on ShiftAssignment(shift_date_id, role) ensured.");
 } catch {
   // index already exists or other non-fatal error
+}
+
+// Migrate JusticeChart to composite-PK schema if still on old single-PK schema
+try {
+  const cols = db.prepare("PRAGMA table_info(JusticeChart)").all() as { name: string }[];
+  const hasShiftTypeCol = cols.some((c) => c.name === "shift_type_id");
+  if (cols.length > 0 && !hasShiftTypeCol) {
+    db.exec("DROP TABLE IF EXISTS JusticeChart");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS JusticeChart (
+        worker_id TEXT NOT NULL REFERENCES Worker(worker_id) ON DELETE CASCADE,
+        shift_type_id TEXT NOT NULL REFERENCES ShiftType(shift_type_id) ON DELETE CASCADE,
+        total_shifts INTEGER NOT NULL DEFAULT 0,
+        weekend_shifts INTEGER NOT NULL DEFAULT 0,
+        period_start TEXT NOT NULL,
+        period_end TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (worker_id, shift_type_id)
+      )
+    `);
+    console.log("JusticeChart migrated to composite-PK schema.");
+  }
+} catch {
+  // table may not exist yet; main exec block handles it
 }
 
 console.log("Migration complete.");

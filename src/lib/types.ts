@@ -142,6 +142,23 @@ export interface ExportData {
   }[];
 }
 
+export interface JusticeChartEntry {
+  worker_id: string;
+  name: string;
+  rank_name: string;
+  total_shifts: number;
+  weekend_shifts: number;
+  shift_counts: Record<string, number>; // shift_type_id -> count
+  period_start: string;
+  period_end: string;
+  updated_at: string;
+}
+
+export interface JusticeChartData {
+  shift_types: { shift_type_id: string; name: string }[];
+  entries: JusticeChartEntry[];
+}
+
 export interface SessionPayload {
   worker_id: string;
   name: string;

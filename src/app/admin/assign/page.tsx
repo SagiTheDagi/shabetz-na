@@ -21,10 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { ForceAssignModal } from "@/components/force-assign-modal";
 import { ExportImageModal, type ExportRow } from "@/components/export-image-modal";
 import type { Quarter, AssignmentWarning } from "@/lib/types";
+import { ChevronDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ---- Interfaces ----
 
@@ -268,6 +271,77 @@ function DraggableWorkerCard({
   );
 }
 
+// ---- Multi-select filter dropdown ----
+
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  className,
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  placeholder: string;
+  className?: string;
+}) {
+  function toggle(value: string) {
+    onChange(
+      selected.includes(value)
+        ? selected.filter((v) => v !== value)
+        : [...selected, value]
+    );
+  }
+
+  const label =
+    selected.length === 0
+      ? placeholder
+      : selected.length === options.length
+      ? "הכל"
+      : selected.length === 1
+      ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
+      : `${selected.length} נבחרו`;
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        className={cn(
+          "h-7 text-xs flex items-center justify-between gap-1 rounded-md border border-input bg-background px-2 hover:bg-muted transition-colors min-w-0",
+          className
+        )}
+      >
+        <span className={cn("truncate", selected.length === 0 && "text-muted-foreground")}>
+          {label}
+        </span>
+        <ChevronDown className="size-3 text-muted-foreground shrink-0" />
+      </PopoverTrigger>
+      <PopoverContent className="w-44 p-1" align="start" side="bottom">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-muted"
+            onClick={() => toggle(opt.value)}
+          >
+            <span
+              className={cn(
+                "size-3.5 rounded-[4px] border flex items-center justify-center shrink-0",
+                selected.includes(opt.value)
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "border-input"
+              )}
+            >
+              {selected.includes(opt.value) && <Check className="size-2.5" />}
+            </span>
+            {opt.label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ---- Assignment slot sub-component (droppable) ----
 
 function AssignmentSlot({
@@ -404,12 +478,10 @@ function DroppableShiftCard({
 
 // ---- Shift List Panel ----
 
-type ShiftStatusFilter = "all" | "full" | "partial" | "empty";
-
 interface ShiftFilters {
-  typeId: string;
-  weekend: "all" | "yes" | "no";
-  status: ShiftStatusFilter;
+  typeIds: string[];
+  weekendFilter: string[]; // "yes" | "no" — empty means all
+  statusFilter: string[];  // "full" | "partial" | "empty" — empty means all
 }
 
 function ShiftListPanel({
@@ -428,9 +500,9 @@ function ShiftListPanel({
   onUnassign: (assignmentId: string) => void;
 }) {
   const [filters, setFilters] = useState<ShiftFilters>({
-    typeId: "",
-    weekend: "all",
-    status: "all",
+    typeIds: [],
+    weekendFilter: [],
+    statusFilter: [],
   });
 
   const shiftTypes = useMemo(
@@ -443,21 +515,26 @@ function ShiftListPanel({
 
   const filtered = useMemo(() => {
     let list = shiftDates;
-    if (filters.typeId) list = list.filter((s) => s.shift_type_name === filters.typeId);
-    if (filters.weekend === "yes") list = list.filter((s) => s.is_weekend === 1);
-    if (filters.weekend === "no") list = list.filter((s) => s.is_weekend === 0);
-    if (filters.status === "full")
-      list = list.filter((s) =>
-        assignments.some((a) => a.shift_date_id === s.shift_date_id && a.role === "shift") &&
-        assignments.some((a) => a.shift_date_id === s.shift_date_id && a.role === "reserve")
-      );
-    if (filters.status === "partial")
+    if (filters.typeIds.length > 0)
+      list = list.filter((s) => filters.typeIds.includes(s.shift_type_name));
+    if (filters.weekendFilter.length > 0 && filters.weekendFilter.length < 2) {
+      if (filters.weekendFilter.includes("yes")) list = list.filter((s) => s.is_weekend === 1);
+      else list = list.filter((s) => s.is_weekend === 0);
+    }
+    if (filters.statusFilter.length > 0 && filters.statusFilter.length < 3) {
       list = list.filter((s) => {
-        const count = assignments.filter((a) => a.shift_date_id === s.shift_date_id).length;
-        return count === 1;
+        const hasShift = assignments.some((a) => a.shift_date_id === s.shift_date_id && a.role === "shift");
+        const hasReserve = assignments.some((a) => a.shift_date_id === s.shift_date_id && a.role === "reserve");
+        const full = hasShift && hasReserve;
+        const empty = !hasShift && !hasReserve;
+        const partial = !full && !empty;
+        return (
+          (filters.statusFilter.includes("full") && full) ||
+          (filters.statusFilter.includes("partial") && partial) ||
+          (filters.statusFilter.includes("empty") && empty)
+        );
       });
-    if (filters.status === "empty")
-      list = list.filter((s) => !assignments.some((a) => a.shift_date_id === s.shift_date_id));
+    }
     return list;
   }, [shiftDates, filters, assignments]);
 
@@ -468,47 +545,34 @@ function ShiftListPanel({
         <span className="text-xs font-semibold text-muted-foreground">
           משמרות ({filtered.length}/{shiftDates.length})
         </span>
-        <Select
-          value={filters.typeId || "all"}
-          onValueChange={(v) => setFilters((f) => ({ ...f, typeId: v === "all" ? "" : (v ?? "") }))}
-        >
-          <SelectTrigger className="h-7 text-xs w-32">
-            <SelectValue placeholder="סוג משמרת" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הסוגים</SelectItem>
-            {shiftTypes.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.weekend}
-          onValueChange={(v) => setFilters((f) => ({ ...f, weekend: v as ShiftFilters["weekend"] }))}
-        >
-          <SelectTrigger className="h-7 text-xs w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הימים</SelectItem>
-            <SelectItem value="yes">סופ&quot;ש</SelectItem>
-            <SelectItem value="no">חול</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.status}
-          onValueChange={(v) => setFilters((f) => ({ ...f, status: v as ShiftStatusFilter }))}
-        >
-          <SelectTrigger className="h-7 text-xs w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">הכל</SelectItem>
-            <SelectItem value="full">מלא</SelectItem>
-            <SelectItem value="partial">חלקי</SelectItem>
-            <SelectItem value="empty">ריק</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelect
+          options={shiftTypes.map((t) => ({ value: t, label: t }))}
+          selected={filters.typeIds}
+          onChange={(v) => setFilters((f) => ({ ...f, typeIds: v }))}
+          placeholder="סוג משמרת"
+          className="w-32"
+        />
+        <MultiSelect
+          options={[
+            { value: "yes", label: 'סופ"ש' },
+            { value: "no", label: "חול" },
+          ]}
+          selected={filters.weekendFilter}
+          onChange={(v) => setFilters((f) => ({ ...f, weekendFilter: v }))}
+          placeholder="ימים"
+          className="w-24"
+        />
+        <MultiSelect
+          options={[
+            { value: "full", label: "מלא" },
+            { value: "partial", label: "חלקי" },
+            { value: "empty", label: "ריק" },
+          ]}
+          selected={filters.statusFilter}
+          onChange={(v) => setFilters((f) => ({ ...f, statusFilter: v }))}
+          placeholder="סטטוס"
+          className="w-24"
+        />
       </div>
 
       {/* Shift list */}
@@ -540,7 +604,7 @@ function ShiftListPanel({
 
 // ---- Worker Panel (right side) ----
 
-type WorkerSortKey = "default" | "name" | "days" | "priority";
+type WorkerSortKey = "default" | "name" | "days" | "priority" | "count";
 
 function WorkerPanel({
   workers,
@@ -549,6 +613,7 @@ function WorkerPanel({
   onRoleChange,
   onAssign,
   viewMode,
+  justiceMap,
 }: {
   workers: WorkerSuggestion[];
   selectedShiftId: string | null;
@@ -556,11 +621,11 @@ function WorkerPanel({
   onRoleChange: (role: "shift" | "reserve") => void;
   onAssign: (workerId: string) => void;
   viewMode: "list" | "calendar";
+  justiceMap: Map<string, number>;
 }) {
-  const [rankFilter, setRankFilter] = useState("");
-  const [availFilter, setAvailFilter] = useState("");
-  const [branchFilter, setBranchFilter] = useState("");
-  const [teamFilter, setTeamFilter] = useState("");
+  const [rankFilter, setRankFilter] = useState<string[]>([]);
+  const [branchFilter, setBranchFilter] = useState<string[]>([]);
+  const [teamFilter, setTeamFilter] = useState<string[]>([]);
   const [showExempt, setShowExempt] = useState(true);
   const [sortKey, setSortKey] = useState<WorkerSortKey>("default");
 
@@ -580,30 +645,40 @@ function WorkerPanel({
   const filteredWorkers = useMemo(() => {
     let list = workers;
     if (!showExempt) list = list.filter((w) => w.is_exempt === 0);
-    if (rankFilter) list = list.filter((w) => w.rank_name === rankFilter);
-    if (availFilter) list = list.filter((w) => w.availability_status === availFilter);
-    if (branchFilter) list = list.filter((w) => w.branch === branchFilter);
-    if (teamFilter) list = list.filter((w) => w.team === teamFilter);
+    if (rankFilter.length > 0) list = list.filter((w) => rankFilter.includes(w.rank_name));
+    if (branchFilter.length > 0) list = list.filter((w) => w.branch !== null && branchFilter.includes(w.branch));
+    if (teamFilter.length > 0) list = list.filter((w) => w.team !== null && teamFilter.includes(w.team));
 
-    if (sortKey === "name") {
-      list = [...list].sort((a, b) => a.name.localeCompare(b.name, "he"));
-    } else if (sortKey === "days") {
-      list = [...list].sort(
-        (a, b) => (b.days_since_last_shift ?? -1) - (a.days_since_last_shift ?? -1)
-      );
-    } else if (sortKey === "priority") {
-      list = [...list].sort(
-        (a, b) => (a.eligibility_priority ?? 999) - (b.eligibility_priority ?? 999)
-      );
-    }
-    return list;
-  }, [workers, showExempt, rankFilter, availFilter, branchFilter, teamFilter, sortKey]);
+    const severityRank: Record<string, number> = { green: 0, orange: 1, amber: 2, red: 3 };
+    const workerSeverity = (w: WorkerSuggestion) =>
+      w.warnings.reduce((m, warn) => Math.max(m, severityRank[warn.severity] ?? 0), 0);
+
+    return [...list].sort((a, b) => {
+      // 1st: warning color (green → orange → amber → red)
+      const sc = workerSeverity(a) - workerSeverity(b);
+      if (sc !== 0) return sc;
+
+      // 2nd: eligibility priority (1 → 2 → none)
+      const pa = a.eligibility_priority ?? 999;
+      const pb = b.eligibility_priority ?? 999;
+      if (pa !== pb) return pa - pb;
+
+      // 3rd: user's chosen sort
+      let userSort = 0;
+      if (sortKey === "name") userSort = a.name.localeCompare(b.name, "he");
+      else if (sortKey === "days") userSort = (b.days_since_last_shift ?? -1) - (a.days_since_last_shift ?? -1);
+      else if (sortKey === "count") userSort = (justiceMap.get(a.worker_id) ?? 0) - (justiceMap.get(b.worker_id) ?? 0);
+      if (userSort !== 0) return userSort;
+
+      // 4th: days since last shift, descending (longer wait = higher priority)
+      return (b.days_since_last_shift ?? -1) - (a.days_since_last_shift ?? -1);
+    });
+  }, [workers, showExempt, rankFilter, branchFilter, teamFilter, sortKey, justiceMap]);
 
   const clearFilters = () => {
-    setRankFilter("");
-    setAvailFilter("");
-    setBranchFilter("");
-    setTeamFilter("");
+    setRankFilter([]);
+    setBranchFilter([]);
+    setTeamFilter([]);
     setShowExempt(true);
     setSortKey("default");
   };
@@ -660,72 +735,37 @@ function WorkerPanel({
         </button>
       </div>
 
-      {/* Rank + availability row */}
+      {/* Rank row */}
       <div className="shrink-0 flex gap-1">
-        <Select
-          value={rankFilter || "all"}
-          onValueChange={(v) => setRankFilter(v === "all" ? "" : (v ?? ""))}
-        >
-          <SelectTrigger className="h-7 text-xs flex-1">
-            <SelectValue placeholder="דרגה" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הדרגות</SelectItem>
-            {ranks.map((r) => (
-              <SelectItem key={r} value={r}>{r}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={availFilter || "all"}
-          onValueChange={(v) => setAvailFilter(v === "all" ? "" : (v ?? ""))}
-        >
-          <SelectTrigger className="h-7 text-xs flex-1">
-            <SelectValue placeholder="זמינות" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הזמינות</SelectItem>
-            <SelectItem value="prefer_work">מעדיף</SelectItem>
-            <SelectItem value="prefer_not_work">מעדיף לא</SelectItem>
-            <SelectItem value="unavailable">לא יכול</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelect
+          options={ranks.map((r) => ({ value: r, label: r }))}
+          selected={rankFilter}
+          onChange={setRankFilter}
+          placeholder="דרגה"
+          className="flex-1"
+        />
       </div>
 
       {/* Branch + team row */}
       {(branches.length > 0 || teams.length > 0) && (
         <div className="shrink-0 flex gap-1">
           {branches.length > 0 && (
-            <Select
-              value={branchFilter || "all"}
-              onValueChange={(v) => setBranchFilter(v === "all" ? "" : (v ?? ""))}
-            >
-              <SelectTrigger className="h-7 text-xs flex-1">
-                <SelectValue placeholder="ענף" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">כל הענפים</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={branches.map((b) => ({ value: b, label: b }))}
+              selected={branchFilter}
+              onChange={setBranchFilter}
+              placeholder="ענף"
+              className="flex-1"
+            />
           )}
           {teams.length > 0 && (
-            <Select
-              value={teamFilter || "all"}
-              onValueChange={(v) => setTeamFilter(v === "all" ? "" : (v ?? ""))}
-            >
-              <SelectTrigger className="h-7 text-xs flex-1">
-                <SelectValue placeholder="צוות" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">כל הצוותים</SelectItem>
-                {teams.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={teams.map((t) => ({ value: t, label: t }))}
+              selected={teamFilter}
+              onChange={setTeamFilter}
+              placeholder="צוות"
+              className="flex-1"
+            />
           )}
         </div>
       )}
@@ -734,13 +774,14 @@ function WorkerPanel({
       <div className="shrink-0 flex gap-1">
         <Select value={sortKey} onValueChange={(v) => setSortKey(v as WorkerSortKey)}>
           <SelectTrigger className="h-7 text-xs flex-1">
-            <SelectValue />
+            <SelectValue placeholder="מיון" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="default">מיון אוטומטי</SelectItem>
             <SelectItem value="name">לפי שם</SelectItem>
             <SelectItem value="days">לפי ימים מאז</SelectItem>
             <SelectItem value="priority">לפי עדיפות</SelectItem>
+            <SelectItem value="count">לפי מספר משמרות</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -984,6 +1025,7 @@ export default function AssignPage() {
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [exportImageOpen, setExportImageOpen] = useState(false);
+  const [justiceMap, setJusticeMap] = useState<Map<string, number>>(new Map());
 
   const [forceModal, setForceModal] = useState<{
     open: boolean;
@@ -1008,6 +1050,17 @@ export default function AssignPage() {
   useEffect(() => {
     loadQuarters();
   }, [loadQuarters]);
+
+  useEffect(() => {
+    fetch("/api/justice-chart")
+      .then((r) => r.json())
+      .then((data: { entries: Array<{ worker_id: string; total_shifts: number }> }) => {
+        const map = new Map<string, number>();
+        for (const e of data.entries) map.set(e.worker_id, e.total_shifts);
+        setJusticeMap(map);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (selectedQuarter) {
@@ -1307,6 +1360,7 @@ export default function AssignPage() {
               if (selectedShiftId) handleAssign(selectedShiftId, workerId, selectedRole);
             }}
             viewMode={viewMode}
+            justiceMap={justiceMap}
           />
         </div>
       </div>

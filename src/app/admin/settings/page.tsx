@@ -9,6 +9,7 @@ import { WorkerImport } from "@/components/worker-import";
 import { WorkerManagement } from "@/components/worker-management";
 import { ShiftDateImport } from "@/components/shift-date-import";
 import { FormResponseImport } from "@/components/form-response-import";
+import { JusticeChart } from "@/components/justice-chart";
 
 export default function SettingsPage() {
   return (
@@ -21,6 +22,7 @@ export default function SettingsPage() {
           <TabsTrigger value="ranks">דרגות</TabsTrigger>
           <TabsTrigger value="shift-types">סוגי משמרות</TabsTrigger>
           <TabsTrigger value="eligibility">מטריצת כשירות</TabsTrigger>
+          <TabsTrigger value="justice">טבלת צדק</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workers">
@@ -67,6 +69,14 @@ export default function SettingsPage() {
           <Card>
             <CardContent className="pt-6">
               <EligibilityMatrix />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="justice">
+          <Card>
+            <CardContent className="pt-6">
+              <JusticeChart />
             </CardContent>
           </Card>
         </TabsContent>

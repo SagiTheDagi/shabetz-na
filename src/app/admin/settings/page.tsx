@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { RankManager } from "@/components/rank-manager";
@@ -11,10 +13,27 @@ import { ShiftDateImport } from "@/components/shift-date-import";
 import { FormResponseImport } from "@/components/form-response-import";
 import { JusticeChart } from "@/components/justice-chart";
 
-export default function SettingsPage() {
+const TAB_VALUES = new Set([
+  "workers",
+  "form-responses",
+  "shift-dates",
+  "ranks",
+  "shift-types",
+  "eligibility",
+  "justice",
+]);
+
+function SettingsTabs() {
+  const params = useSearchParams();
+  const tabParam = params.get("tab");
+  // Honor a ?tab= query param (e.g. deep links from the assign page).
+  const [tab, setTab] = useState(
+    tabParam && TAB_VALUES.has(tabParam) ? tabParam : "shift-dates"
+  );
+
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="shift-dates" dir="rtl">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as string)} dir="rtl">
         <TabsList>
           <TabsTrigger value="workers">עובדים</TabsTrigger>
           <TabsTrigger value="form-responses">ייבוא אילוצים</TabsTrigger>
@@ -82,5 +101,13 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsTabs />
+    </Suspense>
   );
 }

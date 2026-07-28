@@ -25,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { ForceAssignModal } from "@/components/force-assign-modal";
 import { ExportImageModal, type ExportRow } from "@/components/export-image-modal";
+import { WorkerDetailPopover } from "@/components/worker-detail-popover";
 import type { Quarter, AssignmentWarning } from "@/lib/types";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -111,21 +112,15 @@ function getQuarterStartMonth(quarterId: string): { year: number; month: number 
 function WorkerCard({
   worker,
   onAssign,
+  totalShiftsLastYear,
   isDragging = false,
 }: {
   worker: WorkerSuggestion;
   onAssign?: () => void;
+  totalShiftsLastYear?: number;
   isDragging?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const borderClass = getSeverityBorderClass(worker.warnings);
-
-  const hasExtra =
-    worker.standing_constraints ||
-    worker.notes ||
-    worker.release_date ||
-    (worker.is_exempt && worker.exemption_reason) ||
-    worker.eligibility_priority !== null;
 
   return (
     <div
@@ -166,18 +161,11 @@ function WorkerCard({
                 שבץ
               </Button>
             )}
-            {hasExtra && (
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground text-xs w-5 h-5 flex items-center justify-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded((v) => !v);
-                }}
-              >
-                {expanded ? "▲" : "▼"}
-              </button>
-            )}
+            <WorkerDetailPopover
+              worker={worker}
+              onAssign={onAssign}
+              totalShiftsLastYear={totalShiftsLastYear}
+            />
           </div>
         </div>
 
@@ -215,36 +203,6 @@ function WorkerCard({
             </span>
           )}
         </div>
-
-        {/* Expandable extra details */}
-        {expanded && hasExtra && (
-          <div className="mt-2 pt-2 border-t space-y-1">
-            {worker.is_exempt === 1 && worker.exemption_reason && (
-              <p className="text-xs">
-                <span className="font-medium text-red-700 dark:text-red-400">פטור: </span>
-                <span className="text-muted-foreground">{worker.exemption_reason}</span>
-              </p>
-            )}
-            {worker.release_date && (
-              <p className="text-xs">
-                <span className="font-medium">שחרור: </span>
-                <span className="text-muted-foreground">{worker.release_date}</span>
-              </p>
-            )}
-            {worker.standing_constraints && (
-              <p className="text-xs">
-                <span className="font-medium">אילוצים קבועים: </span>
-                <span className="text-muted-foreground">{worker.standing_constraints}</span>
-              </p>
-            )}
-            {worker.notes && (
-              <p className="text-xs">
-                <span className="font-medium">הערות: </span>
-                <span className="text-muted-foreground">{worker.notes}</span>
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -255,9 +213,11 @@ function WorkerCard({
 function DraggableWorkerCard({
   worker,
   onAssign,
+  totalShiftsLastYear,
 }: {
   worker: WorkerSuggestion;
   onAssign?: () => void;
+  totalShiftsLastYear?: number;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `worker-${worker.worker_id}`,
@@ -266,7 +226,7 @@ function DraggableWorkerCard({
 
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
-      <WorkerCard worker={worker} onAssign={onAssign} isDragging={isDragging} />
+      <WorkerCard worker={worker} onAssign={onAssign} totalShiftsLastYear={totalShiftsLastYear} isDragging={isDragging} />
     </div>
   );
 }
@@ -804,6 +764,7 @@ function WorkerPanel({
               key={w.worker_id}
               worker={w}
               onAssign={() => onAssign(w.worker_id)}
+              totalShiftsLastYear={justiceMap.get(w.worker_id)}
             />
           ))
         ) : (
@@ -812,6 +773,7 @@ function WorkerPanel({
               key={w.worker_id}
               worker={w}
               onAssign={() => onAssign(w.worker_id)}
+              totalShiftsLastYear={justiceMap.get(w.worker_id)}
             />
           ))
         )}

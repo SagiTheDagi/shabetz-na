@@ -149,6 +149,7 @@ export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" 
   receives_shift_allocation: number;
   branch: string | null;
   team: string | null;
+  phone: string | null;
   standing_constraints: string | null;
   notes: string | null;
   release_date: string | null;
@@ -243,6 +244,7 @@ export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" 
       receives_shift_allocation: worker.receives_shift_allocation,
       branch: worker.branch,
       team: worker.team,
+      phone: worker.phone,
       standing_constraints: worker.standing_constraints,
       notes: worker.notes,
       release_date: worker.release_date,

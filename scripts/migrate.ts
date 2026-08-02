@@ -128,6 +128,7 @@ for (const sql of [
   "ALTER TABLE Worker ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE Worker ADD COLUMN branch TEXT",
   "ALTER TABLE Worker ADD COLUMN team TEXT",
+  "ALTER TABLE Worker ADD COLUMN phone TEXT",
   "ALTER TABLE ShiftAssignment ADD COLUMN role TEXT NOT NULL DEFAULT 'shift'",
   "ALTER TABLE JusticeChart ADD COLUMN weekend_shifts INTEGER NOT NULL DEFAULT 0",
 ]) {

@@ -22,6 +22,7 @@ export interface WorkerDetailData {
   release_date: string | null;
   branch: string | null;
   team: string | null;
+  phone: string | null;
   notes: string | null;
   standing_constraints: string | null;
   days_since_last_shift: number | null;
@@ -123,6 +124,13 @@ export function WorkerDetailPopover({
             <div className="flex gap-2">
               <span className="text-muted-foreground shrink-0">צוות:</span>
               <span>{worker.team}</span>
+            </div>
+          )}
+
+          {worker.phone && (
+            <div className="flex gap-2">
+              <span className="text-muted-foreground shrink-0">טלפון:</span>
+              <span dir="ltr">{worker.phone}</span>
             </div>
           )}
 

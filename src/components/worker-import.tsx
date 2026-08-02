@@ -19,6 +19,7 @@ interface ParsedWorker {
   notes: string | null;
   branch: string | null;
   team: string | null;
+  phone: string | null;
 }
 
 // Raw row from the xlsx before rank mapping
@@ -33,6 +34,7 @@ interface RawWorker {
   notes: string | null;
   branch: string | null;
   team: string | null;
+  phone: string | null;
 }
 
 // ── xlsx parser ───────────────────────────────────────────────
@@ -46,6 +48,18 @@ function excelDateToIso(serial: unknown): string | null {
   const d = new Date(ms);
   if (isNaN(d.getTime())) return null;
   return d.toISOString().slice(0, 10);
+}
+
+function normalizePhone(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  // xlsx with raw:true reads numeric cells as numbers, dropping the leading 0
+  let s = String(raw).trim();
+  if (!s) return null;
+  // Strip common separators, keep digits and a leading +
+  s = s.replace(/[\s\-().]/g, "");
+  // Restore leading 0 for Israeli mobile numbers stored as numbers (e.g. 501234567)
+  if (/^\d{9}$/.test(s) && s[0] === "5") s = "0" + s;
+  return s;
 }
 
 function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: string[] } {
@@ -67,6 +81,7 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
     const last_name = r[2];
     const first_name = r[3];
     const release_date_raw = r[5];
+    const phone_raw = r[9];   // מספר טלפון נייד
     const notes = r[10];      // הערות
     const eligibility = r[11]; // כשירות
 
@@ -95,6 +110,7 @@ function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: 
       notes: worker_notes,
       branch: null,
       team: null,
+      phone: normalizePhone(phone_raw),
     });
   }
 
@@ -148,6 +164,7 @@ function parseCsvWorkers(
       notes: null,
       branch: null,
       team: null,
+      phone: null,
     });
   }
 

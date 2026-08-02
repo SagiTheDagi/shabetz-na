@@ -33,6 +33,7 @@ export interface Worker {
   is_archived: number;
   branch: string | null;
   team: string | null;
+  phone: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -14,6 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -61,6 +62,7 @@ interface WorkerSuggestion {
   receives_shift_allocation: number;
   branch: string | null;
   team: string | null;
+  phone: string | null;
   standing_constraints: string | null;
   notes: string | null;
   release_date: string | null;
@@ -583,6 +585,7 @@ function WorkerPanel({
   viewMode: "list" | "calendar";
   justiceMap: Map<string, number>;
 }) {
+  const [nameQuery, setNameQuery] = useState("");
   const [rankFilter, setRankFilter] = useState<string[]>([]);
   const [branchFilter, setBranchFilter] = useState<string[]>([]);
   const [teamFilter, setTeamFilter] = useState<string[]>([]);
@@ -604,6 +607,8 @@ function WorkerPanel({
 
   const filteredWorkers = useMemo(() => {
     let list = workers;
+    const q = nameQuery.trim().toLowerCase();
+    if (q) list = list.filter((w) => w.name.toLowerCase().includes(q));
     if (!showExempt) list = list.filter((w) => w.is_exempt === 0);
     if (rankFilter.length > 0) list = list.filter((w) => rankFilter.includes(w.rank_name));
     if (branchFilter.length > 0) list = list.filter((w) => w.branch !== null && branchFilter.includes(w.branch));
@@ -633,9 +638,10 @@ function WorkerPanel({
       // 4th: days since last shift, descending (longer wait = higher priority)
       return (b.days_since_last_shift ?? -1) - (a.days_since_last_shift ?? -1);
     });
-  }, [workers, showExempt, rankFilter, branchFilter, teamFilter, sortKey, justiceMap]);
+  }, [workers, nameQuery, showExempt, rankFilter, branchFilter, teamFilter, sortKey, justiceMap]);
 
   const clearFilters = () => {
+    setNameQuery("");
     setRankFilter([]);
     setBranchFilter([]);
     setTeamFilter([]);
@@ -694,6 +700,15 @@ function WorkerPanel({
           נקה פילטרים
         </button>
       </div>
+
+      {/* Name search */}
+      <Input
+        type="search"
+        value={nameQuery}
+        onChange={(e) => setNameQuery(e.target.value)}
+        placeholder="חיפוש לפי שם"
+        className="h-7 text-xs shrink-0"
+      />
 
       {/* Rank row */}
       <div className="shrink-0 flex gap-1">

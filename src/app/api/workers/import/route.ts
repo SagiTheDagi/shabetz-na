@@ -36,8 +36,21 @@ export async function POST(req: Request) {
      VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
+  // COALESCE(?, col) keeps the existing value when the imported field is null,
+  // so an incomplete import never wipes data that's already filled in.
   const update = db.prepare(
-    `UPDATE Worker SET name = ?, rank_id = ?, is_exempt = ?, exemption_reason = ?, receives_shift_allocation = ?, release_date = ?, notes = ?, branch = ?, team = ?, phone = ?, updated_at = datetime('now')
+    `UPDATE Worker SET
+       name = COALESCE(?, name),
+       rank_id = COALESCE(?, rank_id),
+       is_exempt = COALESCE(?, is_exempt),
+       exemption_reason = COALESCE(?, exemption_reason),
+       receives_shift_allocation = COALESCE(?, receives_shift_allocation),
+       release_date = COALESCE(?, release_date),
+       notes = COALESCE(?, notes),
+       branch = COALESCE(?, branch),
+       team = COALESCE(?, team),
+       phone = COALESCE(?, phone),
+       updated_at = datetime('now')
      WHERE worker_id = ?`
   );
 
@@ -68,11 +81,11 @@ export async function POST(req: Request) {
       if (existing) {
         // Restore if previously archived and re-appears in file
         update.run(
-          row.name,
-          row.rank_id,
-          row.is_exempt,
-          row.exemption_reason,
-          row.receives_shift_allocation,
+          row.name ?? null,
+          row.rank_id ?? null,
+          row.is_exempt ?? null,
+          row.exemption_reason ?? null,
+          row.receives_shift_allocation ?? null,
           row.release_date ?? null,
           row.notes ?? null,
           row.branch ?? null,

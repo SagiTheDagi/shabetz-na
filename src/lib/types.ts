@@ -160,6 +160,18 @@ export interface JusticeChartData {
   entries: JusticeChartEntry[];
 }
 
+export interface PotentialWorker {
+  worker_id: string;
+  name: string;
+  rank_name: string;
+  branch: string | null;
+  team: string | null;
+  is_exempt: number;
+  exemption_reason: string | null;
+  shifts: number;
+  weekends: number;
+}
+
 export interface SessionPayload {
   worker_id: string;
   name: string;

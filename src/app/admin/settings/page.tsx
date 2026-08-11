@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PotentialExport } from "@/components/potential-export";
 import { RankManager } from "@/components/rank-manager";
 import { ShiftTypeManager } from "@/components/shift-type-manager";
 import { EligibilityMatrix } from "@/components/eligibility-matrix";
@@ -30,6 +32,7 @@ function SettingsTabs() {
   const [tab, setTab] = useState(
     tabParam && TAB_VALUES.has(tabParam) ? tabParam : "shift-dates"
   );
+  const [potentialOpen, setPotentialOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -47,6 +50,11 @@ function SettingsTabs() {
         <TabsContent value="workers">
           <Card>
             <CardContent className="pt-6 space-y-8">
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setPotentialOpen(true)}>
+                  ייצוא פוטנציאלים
+                </Button>
+              </div>
               <WorkerManagement />
               <div className="border-t pt-6">
                 <p className="text-sm font-medium mb-4">ייבוא עובדים מקובץ</p>
@@ -100,6 +108,8 @@ function SettingsTabs() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PotentialExport open={potentialOpen} onClose={() => setPotentialOpen(false)} />
     </div>
   );
 }

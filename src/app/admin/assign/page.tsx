@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { ForceAssignModal } from "@/components/force-assign-modal";
 import { ExportImageModal, type ExportRow } from "@/components/export-image-modal";
@@ -70,6 +71,10 @@ interface WorkerSuggestion {
   days_since_last_shift: number | null;
   assigned_this_quarter: boolean;
   availability_status: string | null;
+  /** Free text reason for availability constraint (from form import). */
+  availability_note: string | null;
+  /** Source of the availability row: worker | form_import | admin. */
+  availability_source: string | null;
   is_eligible: boolean;
   eligibility_priority: number | null;
 }
@@ -126,35 +131,28 @@ function WorkerCard({
 
   return (
     <div
-      className={`border rounded-lg border-r-4 ${borderClass} bg-card transition-shadow ${
-        isDragging ? "opacity-50" : "hover:shadow-sm"
+      className={`rounded-lg border-r-[3px] ${borderClass} transition-shadow nocturne-surface ${
+        isDragging ? "opacity-50" : "hover:bg-white/[0.03]"
       }`}
     >
       <div className="p-2.5">
         {/* Row 1: name + rank + branch + team + buttons */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1 min-w-0">
-            <span className="font-medium text-sm">{worker.name}</span>
-            <Badge variant="secondary" className="text-xs shrink-0">
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+            <span className="w-6 h-6 rounded-full grid place-items-center text-[10px] font-medium nocturne-accent-muted nocturne-accent-light">
+              {worker.name.charAt(0)}
+            </span>
+            <span className="font-medium text-[13px]">{worker.name}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded nocturne-accent-muted nocturne-accent-light">
               {worker.rank_name}
-            </Badge>
-            {worker.branch && (
-              <Badge variant="outline" className="text-xs shrink-0 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700">
-                {worker.branch}
-              </Badge>
-            )}
-            {worker.team && (
-              <Badge variant="outline" className="text-xs shrink-0 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700">
-                {worker.team}
-              </Badge>
-            )}
+            </span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {onAssign && (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 text-xs px-2"
+                className="h-6 text-[11px] px-2"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAssign();
@@ -172,39 +170,86 @@ function WorkerCard({
         </div>
 
         {/* Row 2: status badges */}
-        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1.5 text-[11px]">
           {worker.is_exempt === 1 && (
-            <span className="text-xs text-red-600 font-medium">⛔ פטור</span>
+            <span className="text-red-400 font-medium">פטור</span>
           )}
           {!worker.is_eligible && worker.is_exempt === 0 && (
-            <span className="text-xs text-red-600">⛔ לא כשיר</span>
+            <span className="text-red-400">לא כשיר</span>
           )}
           {worker.availability_status === "prefer_work" && (
-            <span className="text-xs text-green-600">🟢 מעדיף</span>
+            worker.availability_note ? (
+              <TooltipProvider delay={200}>
+                <Tooltip>
+                  <TooltipTrigger className="text-green-400 cursor-help border-b border-dotted border-green-400/50">
+                    מעדיף
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    {worker.availability_note}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <span className="text-green-400">מעדיף</span>
+            )
           )}
           {worker.availability_status === "prefer_not_work" && (
-            <span className="text-xs text-orange-500">🟠 מעדיף לא</span>
+            worker.availability_note ? (
+              <TooltipProvider delay={200}>
+                <Tooltip>
+                  <TooltipTrigger className="text-amber-400 cursor-help border-b border-dotted border-amber-400/50">
+                    מעדיף לא
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    {worker.availability_note}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <span className="text-amber-400">מעדיף לא</span>
+            )
           )}
           {worker.availability_status === "unavailable" && (
-            <span className="text-xs text-red-600">🔴 לא יכול</span>
+            worker.availability_note ? (
+              <TooltipProvider delay={200}>
+                <Tooltip>
+                  <TooltipTrigger className="text-red-400 cursor-help border-b border-dotted border-red-400/50">
+                    לא יכול
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    {worker.availability_note}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <span className="text-red-400">לא יכול</span>
+            )
           )}
           {worker.assigned_this_quarter && (
-            <span className="text-xs text-amber-600">✓ שובץ כבר</span>
+            <span className="text-amber-400">שובץ כבר</span>
           )}
           {worker.receives_shift_allocation === 0 && (
-            <span className="text-xs text-muted-foreground">ללא הקצאה</span>
+            <span className="nocturne-text-muted">ללא הקצאה</span>
           )}
           {worker.days_since_last_shift !== null && (
-            <span className="text-xs text-muted-foreground">
-              {worker.days_since_last_shift} ימים מאז
+            <span className="nocturne-text-muted">
+              {worker.days_since_last_shift} ימים
             </span>
           )}
           {worker.eligibility_priority !== null && (
-            <span className="text-xs text-muted-foreground">
-              עדיפות {worker.eligibility_priority}
+            <span className="nocturne-text-muted">
+              ע׳ {worker.eligibility_priority}
             </span>
           )}
         </div>
+
+        {/* Row 3: standing constraints (if any) */}
+        {worker.standing_constraints && (
+          <div className="mt-1 pt-1 border-t border-white/5 text-[10px] nocturne-text-muted truncate">
+            <span className="text-purple-400/70">אילוצים:</span>{" "}
+            {worker.standing_constraints}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -332,35 +377,35 @@ function AssignmentSlot({
     <div
       ref={setNodeRef}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer transition-colors ${
         isOver
-          ? "bg-green-100 dark:bg-green-900/40 ring-1 ring-green-400"
+          ? "bg-green-500/10 ring-1 ring-green-400"
           : isActiveSlot
-          ? "bg-primary/10 ring-1 ring-primary"
-          : "hover:bg-muted/60"
+          ? "nocturne-accent-muted ring-1 ring-[#9184d9]"
+          : "hover:bg-white/[0.03]"
       }`}
     >
-      <span className={`font-medium shrink-0 ${role === "reserve" ? "text-muted-foreground" : ""}`}>
+      <span className={`font-medium shrink-0 ${role === "reserve" ? "nocturne-text-muted" : ""}`}>
         {label}:
       </span>
       {assignment ? (
-        <div className="flex items-center gap-1 min-w-0 ms-1">
-          <span className={`truncate ${role === "shift" ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
+        <div className="flex items-center gap-1.5 min-w-0 ms-1">
+          <span className={`truncate ${role === "shift" ? "text-green-400" : "text-blue-400"}`}>
             {assignment.worker_name}
           </span>
           {assignment.is_forced === 1 && (
-            <Badge variant="destructive" className="text-xs shrink-0 h-4 px-1">כפוי</Badge>
+            <span className="text-[10px] px-1 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">כפוי</span>
           )}
           <button
             type="button"
-            className="shrink-0 text-muted-foreground hover:text-red-500 ms-auto"
+            className="shrink-0 nocturne-text-muted hover:text-red-400 ms-auto"
             onClick={(e) => { e.stopPropagation(); onUnassign(assignment.assignment_id); }}
           >
             ✕
           </button>
         </div>
       ) : (
-        <span className="text-muted-foreground ms-1">—</span>
+        <span className="nocturne-text-muted ms-1">—</span>
       )}
     </div>
   );
@@ -390,29 +435,29 @@ function DroppableShiftCard({
 
   return (
     <div
-      className={`p-3 border rounded-lg transition-all ${
+      className={`p-3 rounded-lg transition-all border border-white/5 ${
         isSelected
-          ? "ring-2 ring-primary bg-primary/5"
+          ? "ring-2 ring-[#9184d9] bg-[#9184d9]/5"
           : bothFilled
-          ? "bg-green-50/60 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+          ? "bg-green-500/5 border-green-500/20"
           : !noneFilled
-          ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900"
-          : "bg-card hover:bg-muted/50"
+          ? "bg-amber-500/5 border-amber-500/20"
+          : "nocturne-surface hover:bg-white/[0.03]"
       }`}
     >
       {/* Header row */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <span className="font-medium text-sm">
+        <span className="font-medium text-[13px]">
           {formatDate(shift.date)} {getDayName(shift.date)}
         </span>
-        <Badge variant="outline" className="text-xs">{shift.shift_type_name}</Badge>
+        <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 nocturne-text-muted">{shift.shift_type_name}</span>
         {shift.is_weekend === 1 && shift.shift_type_id !== "GUARD" && (
-          <Badge className="text-xs bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
             סופ&quot;ש
-          </Badge>
+          </span>
         )}
-        {bothFilled && <span className="text-xs text-green-600 ms-auto">✅ מלא</span>}
-        {!noneFilled && !bothFilled && <span className="text-xs text-amber-600 ms-auto">⚡ חלקי</span>}
+        {bothFilled && <span className="text-[11px] text-green-400 ms-auto">מלא</span>}
+        {!noneFilled && !bothFilled && <span className="text-[11px] text-amber-400 ms-auto">חלקי</span>}
       </div>
 
       {/* Slots */}
@@ -651,8 +696,8 @@ function WorkerPanel({
 
   if (!selectedShiftId) {
     return (
-      <div className="flex-none w-72 border-s ps-4 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground text-center">
+      <div className="flex-none w-80 border-r border-white/5 pr-4 flex items-center justify-center">
+        <p className="text-[13px] nocturne-text-muted text-center">
           בחר משמרת כדי לראות עובדים
         </p>
       </div>
@@ -660,15 +705,15 @@ function WorkerPanel({
   }
 
   return (
-    <div className="flex-none w-72 border-s ps-3 flex flex-col min-h-0 gap-2">
+    <div className="flex-none w-80 border-r border-white/5 pr-4 flex flex-col min-h-0 gap-2">
       {/* Role toggle */}
-      <div className="shrink-0 flex rounded-md border overflow-hidden text-xs">
+      <div className="shrink-0 flex rounded-lg overflow-hidden text-[12px] nocturne-surface">
         <button
           type="button"
-          className={`flex-1 px-3 py-1.5 transition-colors font-medium ${
+          className={`flex-1 px-3 py-2 transition-colors font-medium ${
             selectedRole === "shift"
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-muted"
+              ? "nocturne-accent-bg"
+              : "hover:bg-white/5"
           }`}
           onClick={() => onRoleChange("shift")}
         >
@@ -676,10 +721,10 @@ function WorkerPanel({
         </button>
         <button
           type="button"
-          className={`flex-1 px-3 py-1.5 transition-colors font-medium border-s ${
+          className={`flex-1 px-3 py-2 transition-colors font-medium border-r border-white/5 ${
             selectedRole === "reserve"
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-muted"
+              ? "nocturne-accent-bg"
+              : "hover:bg-white/5"
           }`}
           onClick={() => onRoleChange("reserve")}
         >
@@ -689,12 +734,12 @@ function WorkerPanel({
 
       {/* Header + clear */}
       <div className="shrink-0 flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground">
+        <span className="text-[11px] font-medium nocturne-text-muted">
           עובדים ({filteredWorkers.length}/{workers.length})
         </span>
         <button
           type="button"
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="text-[11px] nocturne-text-muted hover:nocturne-accent-light"
           onClick={clearFilters}
         >
           נקה פילטרים

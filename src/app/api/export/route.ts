@@ -35,12 +35,12 @@ export async function GET(req: NextRequest) {
 
   const worker_availability = db
     .prepare(
-      "SELECT worker_id, date, status FROM WorkerAvailability WHERE quarter_id = ? ORDER BY worker_id, date"
+      "SELECT worker_id, date, status, source, note FROM WorkerAvailability WHERE quarter_id = ? ORDER BY worker_id, date"
     )
     .all(quarterId);
 
   const exportData: ExportData = {
-    version: 3,
+    version: 4,
     exported_at: new Date().toISOString(),
     ranks: ranks as ExportData["ranks"],
     shift_types: shift_types as ExportData["shift_types"],
@@ -106,10 +106,19 @@ export async function POST(req: Request) {
     }
 
     const insertAvail = db.prepare(
-      "INSERT INTO WorkerAvailability (availability_id, worker_id, quarter_id, date, status) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO WorkerAvailability (availability_id, worker_id, quarter_id, date, status, source, note) VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
     for (const av of data.worker_availability) {
-      insertAvail.run(uuid(), av.worker_id, q.quarter_id, av.date, av.status);
+      // Exports predating v4 carry no provenance; treat them as worker-entered.
+      insertAvail.run(
+        uuid(),
+        av.worker_id,
+        q.quarter_id,
+        av.date,
+        av.status,
+        av.source ?? "worker",
+        av.note ?? null
+      );
     }
   });
 

@@ -104,6 +104,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       fields.push("team = ?");
       values.push(body.team ?? null);
     }
+    if ("in_whatsapp_group" in body) {
+      fields.push("in_whatsapp_group = ?");
+      values.push(validateBoolean(body.in_whatsapp_group) ? 1 : 0);
+    }
+    if ("phone" in body) {
+      fields.push("phone = ?");
+      values.push(body.phone ?? null);
+    }
 
     if (fields.length === 0) {
       return NextResponse.json({ error: "אין שדות לעדכון" }, { status: 400 });

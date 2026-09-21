@@ -34,6 +34,7 @@ export interface Worker {
   branch: string | null;
   team: string | null;
   phone: string | null;
+  in_whatsapp_group: number; // SQLite boolean: 0 or 1
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +61,10 @@ export interface WorkerAvailability {
   quarter_id: string;
   date: string;
   status: "unavailable" | "prefer_work" | "prefer_not_work";
+  /** Who created this row. Determines what a given save is allowed to replace. */
+  source: AvailabilitySource;
+  /** Original free-text that produced this row, when it came from an import. */
+  note: string | null;
 }
 
 export interface ShiftAssignment {
@@ -82,6 +87,22 @@ export interface ShiftHistory {
 }
 
 export type AvailabilityStatus = "unavailable" | "prefer_work" | "prefer_not_work";
+
+/**
+ * Provenance of a WorkerAvailability row.
+ * - `worker`      — submitted by the worker through /worker
+ * - `form_import` — parsed from a Google Forms constraints file
+ * - `admin`       — entered manually by an admin
+ */
+export type AvailabilitySource = "worker" | "form_import" | "admin";
+
+export const AVAILABILITY_STATUSES: AvailabilityStatus[] = [
+  "unavailable",
+  "prefer_work",
+  "prefer_not_work",
+];
+
+export const AVAILABILITY_SOURCES: AvailabilitySource[] = ["worker", "form_import", "admin"];
 export type QuarterStatus = "draft" | "in_progress" | "published";
 
 export type WarningSeverity = "green" | "orange" | "amber" | "red";
@@ -140,6 +161,9 @@ export interface ExportData {
     worker_id: string;
     date: string;
     status: AvailabilityStatus;
+    /** Absent in exports from before v4. */
+    source?: AvailabilitySource;
+    note?: string | null;
   }[];
 }
 

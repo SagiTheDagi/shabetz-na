@@ -22,10 +22,6 @@ export function JusticeChart() {
   const [selectedRanks, setSelectedRanks] = useState<Set<string>>(new Set());
   const [minTotal, setMinTotal] = useState(0);
 
-  useEffect(() => {
-    loadChart();
-  }, []);
-
   async function loadChart() {
     setLoading(true);
     try {
@@ -35,6 +31,10 @@ export function JusticeChart() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    loadChart();
+  }, []);
 
   async function handleUpdate() {
     setUpdating(true);
@@ -54,7 +54,7 @@ export function JusticeChart() {
     }
   }
 
-  const entries = data?.entries ?? [];
+  const entries = useMemo(() => data?.entries ?? [], [data]);
   const shiftTypes = data?.shift_types ?? [];
   const firstEntry = entries[0];
 
@@ -88,7 +88,8 @@ export function JusticeChart() {
   function toggleRank(rank: string) {
     setSelectedRanks((prev) => {
       const next = new Set(prev);
-      next.has(rank) ? next.delete(rank) : next.add(rank);
+      if (next.has(rank)) next.delete(rank);
+      else next.add(rank);
       return next;
     });
   }
@@ -118,7 +119,7 @@ export function JusticeChart() {
             </p>
           ) : (
             !loading && (
-              <p className="text-xs text-muted-foreground">טבלת הצדק לא חושבה עדיין. לחץ על "עדכן טבלת צדק".</p>
+              <p className="text-xs text-muted-foreground">טבלת הצדק לא חושבה עדיין. לחץ על &quot;עדכן טבלת צדק&quot;.</p>
             )
           )}
         </div>
@@ -209,7 +210,7 @@ export function JusticeChart() {
         <p className="text-sm text-muted-foreground">טוען...</p>
       ) : entries.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
-          אין נתונים. לחץ על "עדכן טבלת צדק" כדי לחשב.
+          אין נתונים. לחץ על &quot;עדכן טבלת צדק&quot; כדי לחשב.
         </p>
       ) : filteredEntries.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">לא נמצאו עובדים התואמים את הסינון.</p>

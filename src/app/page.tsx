@@ -2,10 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,55 +48,79 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">שב&quot;צ-נא</CardTitle>
-          <p className="text-sm text-muted-foreground">מערכת ניהול משמרות</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="worker_id">מספר עובד</Label>
-              <Input
-                id="worker_id"
-                value={workerId}
-                onChange={(e) => {
-                  setWorkerId(e.target.value);
-                  setNeedsPassword(false);
-                  setError("");
-                }}
-                placeholder="הזן מספר עובד"
+    <div className="min-h-screen flex items-center justify-center p-4 nocturne-bg">
+      <div className="w-full max-w-[400px] rounded-[14px] p-6 nocturne-surface shadow-lg">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-[28px] font-semibold mb-1 nocturne-text tracking-tight">
+            שב״צ-נא
+          </h1>
+          <p className="text-sm nocturne-text-muted">
+            מערכת ניהול משמרות רבעוניות
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label 
+              htmlFor="worker_id" 
+              className="block text-xs nocturne-text-subtle"
+            >
+              מספר עובד
+            </label>
+            <input
+              id="worker_id"
+              type="text"
+              value={workerId}
+              onChange={(e) => {
+                setWorkerId(e.target.value);
+                setNeedsPassword(false);
+                setError("");
+              }}
+              placeholder="הזן מספר עובד"
+              autoFocus
+              disabled={loading}
+              className="w-full h-9 px-2.5 text-sm rounded-lg outline-none transition-colors nocturne-surface nocturne-text border nocturne-border focus:border-primary caret-primary"
+            />
+          </div>
+
+          {needsPassword && (
+            <div className="space-y-1.5">
+              <label 
+                htmlFor="password" 
+                className="block text-xs nocturne-text-subtle"
+              >
+                סיסמה
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="הזן סיסמה"
                 autoFocus
                 disabled={loading}
+                className="w-full h-9 px-2.5 text-sm rounded-lg outline-none transition-colors nocturne-surface nocturne-text border nocturne-border focus:border-primary caret-primary"
               />
             </div>
+          )}
 
-            {needsPassword && (
-              <div className="space-y-2">
-                <Label htmlFor="password">סיסמה</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="הזן סיסמה"
-                  autoFocus
-                  disabled={loading}
-                />
-              </div>
-            )}
+          {error && (
+            <div className="text-sm p-2.5 rounded-lg bg-status-unavailable-bg text-error">
+              {error}
+            </div>
+          )}
 
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading || !workerId.trim()}>
-              {loading ? "מתחבר..." : "כניסה"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <button
+            type="submit"
+            disabled={loading || !workerId.trim()}
+            className="w-full h-9 text-sm font-medium rounded-lg transition-colors disabled:opacity-45 disabled:cursor-not-allowed bg-transparent border border-primary text-primary hover:bg-primary/10"
+          >
+            {loading ? "מתחבר..." : "כניסה"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

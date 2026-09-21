@@ -27,6 +27,12 @@ export interface WorkerDetailData {
   standing_constraints: string | null;
   days_since_last_shift: number | null;
   assigned_this_quarter: boolean;
+  /** Current availability status for the selected shift date. */
+  availability_status?: string | null;
+  /** Free text reason for the availability constraint. */
+  availability_note?: string | null;
+  /** Source of the availability: worker | form_import | admin. */
+  availability_source?: string | null;
 }
 
 function formatReleaseDate(d: string) {
@@ -138,6 +144,39 @@ export function WorkerDetailPopover({
             <div className="flex gap-2">
               <span className="text-muted-foreground shrink-0">אילוצים קבועים:</span>
               <span>{worker.standing_constraints}</span>
+            </div>
+          )}
+
+          {/* Availability context for selected shift */}
+          {worker.availability_status && (
+            <div className="pt-1 border-t space-y-1">
+              <div className="flex gap-2">
+                <span className="text-muted-foreground shrink-0">זמינות לתאריך:</span>
+                <span className={
+                  worker.availability_status === "unavailable"
+                    ? "text-red-600 dark:text-red-400 font-medium"
+                    : worker.availability_status === "prefer_not_work"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : worker.availability_status === "prefer_work"
+                    ? "text-green-600 dark:text-green-400"
+                    : ""
+                }>
+                  {worker.availability_status === "unavailable" && "לא יכול"}
+                  {worker.availability_status === "prefer_not_work" && "מעדיף לא"}
+                  {worker.availability_status === "prefer_work" && "מעדיף לעבוד"}
+                </span>
+                {worker.availability_source === "form_import" && (
+                  <span className="text-[10px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    מטופס
+                  </span>
+                )}
+              </div>
+              {worker.availability_note && (
+                <div className="text-sm bg-muted/40 rounded px-2 py-1.5">
+                  <span className="text-muted-foreground text-xs">סיבה: </span>
+                  {worker.availability_note}
+                </div>
+              )}
             </div>
           )}
 

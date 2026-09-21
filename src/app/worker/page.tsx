@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { ShiftDateWithType, WorkerAvailability, Quarter, AvailabilityStatus } from "@/lib/types";
 
@@ -16,12 +13,12 @@ const STATUS_CYCLE: (AvailabilityStatus | "default")[] = [
 
 const STATUS_CONFIG: Record<
   string,
-  { bg: string; label: string; emoji: string }
+  { bgClass: string; ringClass: string; label: string; colorClass: string; dotClass: string }
 > = {
-  default: { bg: "bg-card", label: "ללא העדפה", emoji: "" },
-  unavailable: { bg: "bg-red-100 dark:bg-red-950 border-red-300 dark:border-red-800", label: "לא יכול", emoji: "🔴" },
-  prefer_work: { bg: "bg-green-100 dark:bg-green-950 border-green-300 dark:border-green-800", label: "מעדיף לעבוד", emoji: "🟢" },
-  prefer_not_work: { bg: "bg-orange-100 dark:bg-orange-950 border-orange-300 dark:border-orange-800", label: "מעדיף לא", emoji: "🟠" },
+  default: { bgClass: "bg-status-default-bg", ringClass: "shadow-[inset_0_0_0_1px_rgba(233,233,237,0.09)]", label: "ללא העדפה", colorClass: "text-status-default-text", dotClass: "bg-status-default-text" },
+  unavailable: { bgClass: "bg-status-unavailable-bg", ringClass: "ring-1 ring-inset ring-error", label: "לא זמין", colorClass: "text-error", dotClass: "bg-error" },
+  prefer_work: { bgClass: "bg-status-prefer-work-bg", ringClass: "ring-1 ring-inset ring-success", label: "מעדיף לעבוד", colorClass: "text-success", dotClass: "bg-success" },
+  prefer_not_work: { bgClass: "bg-status-prefer-not-work-bg", ringClass: "ring-1 ring-inset ring-warning", label: "מעדיף לא", colorClass: "text-warning", dotClass: "bg-warning" },
 };
 
 export default function WorkerPage() {
@@ -126,101 +123,120 @@ export default function WorkerPage() {
 
   const hebrewDays = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
+  const markedCount = availability.size;
+  const totalCount = shiftDates.length;
+
   if (quarters.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      <div className="text-center py-12 nocturne-text-muted">
         <p>אין רבעון פעיל כרגע</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       {/* Quarter selector */}
       {quarters.length > 1 && (
         <div className="flex gap-2">
           {quarters.map((q) => (
-            <Button
+            <button
               key={q.quarter_id}
-              variant={selectedQuarter === q.quarter_id ? "default" : "outline"}
-              size="sm"
               onClick={() => setSelectedQuarter(q.quarter_id)}
+              className={`h-8 px-3 text-xs rounded-lg transition-colors border ${
+                selectedQuarter === q.quarter_id 
+                  ? "bg-primary border-primary text-primary-foreground" 
+                  : "bg-transparent nocturne-border nocturne-text"
+              }`}
             >
               {q.quarter_id}
-            </Button>
+            </button>
           ))}
         </div>
       )}
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-sm">
+      <div className="flex flex-wrap gap-4 text-sm">
         {Object.entries(STATUS_CONFIG)
           .filter(([key]) => key !== "default")
           .map(([key, config]) => (
-            <span key={key} className="flex items-center gap-1">
-              <span>{config.emoji}</span>
-              <span>{config.label}</span>
+            <span key={key} className="flex items-center gap-2">
+              <span className={`w-3 h-3 rounded-sm ${config.dotClass}`} />
+              <span className="nocturne-text-subtle">{config.label}</span>
             </span>
           ))}
       </div>
-      <p className="text-xs text-muted-foreground">לחץ על תאריך כדי לשנות סטטוס</p>
+      
+      <p className="text-xs nocturne-text-muted">
+        לחץ על תאריך כדי לשנות סטטוס · {markedCount} ימים סומנו מתוך {totalCount}
+      </p>
 
       {/* Calendar by month */}
       {Array.from(byMonth.entries()).map(([monthKey, dates]) => {
         const [year, month] = monthKey.split("-");
         return (
-          <Card key={monthKey}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                {hebrewMonths[month]} {year}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {dates.map((sd) => {
-                  const status = availability.get(sd.date) || "default";
-                  const config = STATUS_CONFIG[status];
-                  const dateObj = new Date(sd.date + "T00:00:00");
-                  const dayNum = dateObj.getDate();
-                  const dayName = hebrewDays[dateObj.getDay()];
+          <section 
+            key={monthKey}
+            className="rounded-lg py-4 px-[18px] nocturne-surface"
+          >
+            <h3 className="text-base font-medium mb-3">
+              {hebrewMonths[month]} {year}
+            </h3>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {dates.map((sd) => {
+                const status = availability.get(sd.date) || "default";
+                const config = STATUS_CONFIG[status];
+                const dateObj = new Date(sd.date + "T00:00:00");
+                const dayNum = dateObj.getDate();
+                const dayName = hebrewDays[dateObj.getDay()];
 
-                  return (
-                    <button
-                      key={sd.shift_date_id}
-                      onClick={() => toggleDate(sd.date)}
-                      className={`p-3 rounded-lg border text-center transition-colors ${config.bg} hover:opacity-80`}
-                    >
-                      <div className="text-lg font-bold">{dayNum}</div>
-                      <div className="text-xs text-muted-foreground">יום {dayName}</div>
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        {sd.shift_type_name}
-                      </Badge>
-                      {sd.is_weekend ? (
-                        <div className="text-xs text-slate-400 mt-1">סופ&quot;ש</div>
-                      ) : null}
-                      {config.emoji && (
-                        <div className="mt-1">{config.emoji}</div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                return (
+                  <button
+                    key={sd.shift_date_id}
+                    onClick={() => toggleDate(sd.date)}
+                    className={`p-3 rounded-lg text-center transition-all cursor-pointer hover:opacity-80 ${config.bgClass} ${config.ringClass}`}
+                  >
+                    <div className="text-[17px] font-medium leading-none font-sans">
+                      {dayNum}
+                    </div>
+                    <div className="text-[10px] mt-1 nocturne-text-tertiary">
+                      יום {dayName}
+                    </div>
+                    <div className="text-[10.5px] mt-1.5 py-0.5 px-2 rounded inline-block bg-muted nocturne-text-subtle">
+                      {sd.shift_type_name}
+                    </div>
+                    {sd.is_weekend && (
+                      <div className="text-[10.5px] mt-1 py-0.5 px-2 rounded inline-block nocturne-accent-badge">
+                        סופ״ש
+                      </div>
+                    )}
+                    {status !== "default" && (
+                      <div className={`text-[10px] mt-1.5 font-medium ${config.colorClass}`}>
+                        {config.label}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         );
       })}
 
       {/* Save button */}
       {shiftDates.length > 0 && (
         <div className="sticky bottom-4">
-          <Button
+          <button
             onClick={handleSave}
             disabled={saving || !dirty}
-            className="w-full"
-            size="lg"
+            className={`w-full h-11 text-sm font-medium rounded-lg transition-colors disabled:opacity-45 disabled:cursor-not-allowed border ${
+              dirty 
+                ? "bg-transparent border-primary text-primary hover:bg-primary/10" 
+                : "bg-status-prefer-work-bg border-success text-success"
+            }`}
           >
-            {saving ? "שומר..." : dirty ? "💾 שמירת שינויים" : "✓ נשמר"}
-          </Button>
+            {saving ? "שומר..." : dirty ? "שמירת שינויים" : "נשמר"}
+          </button>
         </div>
       )}
     </div>

@@ -19,6 +19,7 @@ standalone/
 *.db-journal
 *.db-wal
 *.db-shm
+dev-db/
 
 # OS
 .DS_Store
@@ -27,12 +28,17 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+tsconfig.tsbuildinfo
 
 # AI
 /.claude
 CLAUDE.md
+AGENTS.md
 docs/business-rules.md
 docs/ranks-and-shifts.md
 /docs
 docs/
 docs/business-rules.md
+
+#design
+Shabetz-na Redesign.html

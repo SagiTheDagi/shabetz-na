@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
+import { Inter, Assistant } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
+
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const assistant = Assistant({
+  subsets: ["latin", "hebrew"],
+  variable: "--font-assistant",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "שב\"צ-נא",
@@ -15,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="he" dir="rtl" className={`h-full antialiased dark ${inter.variable} ${assistant.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -24,8 +37,8 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="min-h-full flex flex-col bg-background text-foreground"
-        style={{ fontFamily: '"Segoe UI", Arial, sans-serif' }}
+        className="min-h-full flex flex-col bg-background text-foreground font-assistant"
+        suppressHydrationWarning
       >
         <ThemeProvider>
           <TooltipProvider>

@@ -4,12 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Nocturne Design System - shabetz-na */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-assistant), var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-assistant: var(--font-assistant);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,82 +41,160 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  
+  /* Layout dimensions */
+  --sidebar-width: 214px;
+  --avatar-size: 26px;
+  --header-height: 56px;
+  
+  /* Text sizes */
+  --text-2xs: 10.5px;
+  --text-heading: 17px;
+  
+  /* Nocturne color ramps */
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+  
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+  
+  /* Status colors */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  
+  /* Status state backgrounds */
+  --color-status-default-bg: var(--status-default-bg);
+  --color-status-default-text: var(--status-default-text);
+  --color-status-unavailable-bg: var(--status-unavailable-bg);
+  --color-status-unavailable-text: var(--status-unavailable-text);
+  --color-status-prefer-work-bg: var(--status-prefer-work-bg);
+  --color-status-prefer-work-text: var(--status-prefer-work-text);
+  --color-status-prefer-not-work-bg: var(--status-prefer-not-work-bg);
+  --color-status-prefer-not-work-text: var(--status-prefer-not-work-text);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Nocturne dark theme as default (system is dark-first) */
+  --background: #161826;
+  --foreground: #e9e9ed;
+  --card: #232532;
+  --card-foreground: #e9e9ed;
+  --popover: #232532;
+  --popover-foreground: #e9e9ed;
+  --primary: #9184d9;
+  --primary-foreground: #161826;
+  --secondary: #2b2741;
+  --secondary-foreground: #e9e9ed;
+  --muted: #292b31;
+  --muted-foreground: #75798c;
+  --accent: #9184d9;
+  --accent-foreground: #f5f4ff;
+  --destructive: #e08a8a;
+  --border: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --input: #232532;
+  --ring: #9184d9;
+  --chart-1: #9184d9;
+  --chart-2: #796cbf;
+  --chart-3: #5d5294;
+  --chart-4: #423a6a;
+  --chart-5: #2b2741;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: linear-gradient(180deg, #191b2b, #161826);
+  --sidebar-foreground: #cfd3e5;
+  --sidebar-primary: #9184d9;
+  --sidebar-primary-foreground: #f5f4ff;
+  --sidebar-accent: #2b2741;
+  --sidebar-accent-foreground: #e9e9ed;
+  --sidebar-border: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --sidebar-ring: #9184d9;
+  
+  /* Nocturne specific */
+  --surface: #232532;
+  --divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --section: #262a60;
+  --section-glow: #353b80;
+  
+  /* Status colors */
+  --success: #86c9a4;
+  --warning: #dcb182;
+  --error: #e08a8a;
+  
+  /* Status backgrounds (for availability states) */
+  --status-default-bg: #292b31;
+  --status-default-text: #9397ab;
+  --status-unavailable-bg: #3f2b2f;
+  --status-unavailable-text: #e08a8a;
+  --status-prefer-work-bg: #1f2b28;
+  --status-prefer-work-text: #86c9a4;
+  --status-prefer-not-work-bg: #3a2f1f;
+  --status-prefer-not-work-text: #dcb182;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* .dark inherits from :root - Nocturne is dark-first */
+
+/* Light theme - inverted Nocturne */
+.light {
+  --background: #f3f5fe;
+  --foreground: #292b31;
+  --card: #ffffff;
+  --card-foreground: #292b31;
+  --popover: #ffffff;
+  --popover-foreground: #292b31;
+  --primary: #796cbf;
+  --primary-foreground: #f5f4ff;
+  --secondary: #e7e5fe;
+  --secondary-foreground: #292b31;
+  --muted: #e4e7f5;
+  --muted-foreground: #595d6c;
+  --accent: #796cbf;
+  --accent-foreground: #f5f4ff;
+  --destructive: #dc2626;
+  --border: color-mix(in srgb, #292b31 12%, transparent);
+  --input: #ffffff;
+  --ring: #796cbf;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #292b31;
+  --sidebar-primary: #796cbf;
+  --sidebar-primary-foreground: #f5f4ff;
+  --sidebar-accent: #e7e5fe;
+  --sidebar-accent-foreground: #292b31;
+  --sidebar-border: color-mix(in srgb, #292b31 12%, transparent);
+  --sidebar-ring: #796cbf;
+  
+  /* Status colors for light theme */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --status-default-bg: #e4e7f5;
+  --status-default-text: #595d6c;
+  --status-unavailable-bg: #fee2e2;
+  --status-unavailable-text: #dc2626;
+  --status-prefer-work-bg: #dcfce7;
+  --status-prefer-work-text: #16a34a;
+  --status-prefer-not-work-bg: #fef3c7;
+  --status-prefer-not-work-text: #d97706;
 }
 
 @layer base {
@@ -127,4 +207,36 @@
   html {
     @apply font-sans;
   }
+  
+  /* Custom scrollbar for Nocturne */
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #3f424d;
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
+
+/* Nocturne utility classes */
+.nocturne-bg { background: #161826; }
+.nocturne-surface { background: #232532; }
+.nocturne-sidebar { background: linear-gradient(180deg, #191b2b, #161826); }
+.nocturne-text { color: #e9e9ed; }
+.nocturne-text-muted { color: #75798c; }
+.nocturne-text-secondary { color: #cfd3e5; }
+.nocturne-text-tertiary { color: #9397ab; }
+.nocturne-text-subtle { color: #b2b6ca; }
+.nocturne-accent { color: #9184d9; }
+.nocturne-accent-bg { background: #9184d9; }
+.nocturne-accent-muted { background: #2b2741; }
+.nocturne-accent-light { color: #d2cefd; }
+.nocturne-accent-badge { background: #423a6a; color: #f5f4ff; }
+.nocturne-border { border-color: color-mix(in srgb, #e9e9ed 16%, transparent); }
+.nocturne-success { color: #86c9a4; }
+.nocturne-warning { color: #dcb182; }
+.nocturne-error { color: #e08a8a; }

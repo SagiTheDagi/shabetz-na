@@ -60,17 +60,22 @@ export function getWorkerWarnings(
     | WorkerAvailability
     | undefined;
 
+  // The note carries the worker's own wording ("חתונה של אחי") when the row
+  // came from a parsed constraints file, so the scheduler sees the reason and
+  // not just the verdict.
+  const availabilityReason = availability?.note?.trim() ? ` — ${availability.note.trim()}` : "";
+
   if (availability?.status === "unavailable") {
     warnings.push({
       type: "unavailable",
       severity: "red",
-      message: "העובד הגיש שלא יכול ביום זה",
+      message: `העובד הגיש שלא יכול ביום זה${availabilityReason}`,
     });
   } else if (availability?.status === "prefer_not_work") {
     warnings.push({
       type: "prefer_not",
       severity: "orange",
-      message: "העובד מעדיף לא לעבוד ביום זה",
+      message: `העובד מעדיף לא לעבוד ביום זה${availabilityReason}`,
     });
   }
 
@@ -157,6 +162,10 @@ export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" 
   days_since_last_shift: number | null;
   assigned_this_quarter: boolean;
   availability_status: string | null;
+  /** Free text behind the availability row, when it came from a parsed import. */
+  availability_note: string | null;
+  /** Which channel produced the availability row: worker | form_import | admin. */
+  availability_source: string | null;
   eligibility_priority: number | null;
   is_eligible: boolean;
 }[] {
@@ -198,10 +207,10 @@ export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" 
     // Availability for this date
     const avail = db
       .prepare(
-        "SELECT status FROM WorkerAvailability WHERE worker_id = ? AND quarter_id = ? AND date = ?"
+        "SELECT status, source, note FROM WorkerAvailability WHERE worker_id = ? AND quarter_id = ? AND date = ?"
       )
       .get(worker.worker_id, shiftDate.quarter_id, shiftDate.date) as
-      | { status: string }
+      | { status: string; source: string; note: string | null }
       | undefined;
 
     // Already assigned this quarter (reserve does not count as a shift)
@@ -252,6 +261,8 @@ export function getSortedWorkers(shiftDateId: string, role: "shift" | "reserve" 
       days_since_last_shift: daysSince,
       assigned_this_quarter: !!assigned,
       availability_status: avail?.status || null,
+      availability_note: avail?.note ?? null,
+      availability_source: avail?.source ?? null,
       eligibility_priority: elig?.priority ?? null,
       is_eligible: !!elig,
     };

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { v4 as uuid } from "uuid";
-import type { AvailabilityStatus } from "@/lib/types";
+import {
+  readAvailability,
+  replaceAvailability,
+  validateEntries,
+  type AvailabilityEntry,
+} from "@/lib/availability-repo";
+import { AVAILABILITY_SOURCES, type AvailabilitySource } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -11,14 +16,32 @@ export async function GET(req: NextRequest) {
   }
 
   const quarterId = req.nextUrl.searchParams.get("quarter_id");
+  const allWorkers = req.nextUrl.searchParams.get("all") === "true";
   const workerId = req.nextUrl.searchParams.get("worker_id") || session.worker_id;
 
-  // Non-admin can only see their own
+  const db = getDb();
+
+  // Whole-quarter read, for the admin import/review screens.
+  if (allWorkers) {
+    if (!session.is_admin) {
+      return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+    }
+    if (!quarterId) {
+      return NextResponse.json({ error: "נדרש רבעון" }, { status: 400 });
+    }
+    const rows = db
+      .prepare(
+        "SELECT * FROM WorkerAvailability WHERE quarter_id = ? ORDER BY worker_id, date"
+      )
+      .all(quarterId);
+    return NextResponse.json(rows);
+  }
+
+  // Non-admin can only read their own.
   if (!session.is_admin && workerId !== session.worker_id) {
     return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
   }
 
-  const db = getDb();
   let query = "SELECT * FROM WorkerAvailability WHERE worker_id = ?";
   const params: string[] = [workerId];
 
@@ -28,10 +51,20 @@ export async function GET(req: NextRequest) {
   }
 
   query += " ORDER BY date";
-  const availability = db.prepare(query).all(...params);
-  return NextResponse.json(availability);
+  return NextResponse.json(db.prepare(query).all(...params));
 }
 
+/**
+ * Replaces a worker's availability for one quarter.
+ *
+ * The delete is scoped to a single `source`, so each channel only ever clears
+ * its own rows: a worker saving their calendar cannot wipe admin-imported
+ * constraints, and re-running a form import cannot wipe what the worker
+ * entered themselves.
+ *
+ * A non-admin may only write their own rows, always as source `worker`.
+ * An admin may target another worker via `worker_id` and choose the source.
+ */
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -40,37 +73,54 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const { quarter_id, entries } = body as {
-    quarter_id: string;
-    entries: { date: string; status: AvailabilityStatus }[];
+    quarter_id?: string;
+    entries?: AvailabilityEntry[];
   };
 
   if (!quarter_id || !Array.isArray(entries)) {
     return NextResponse.json({ error: "נדרש רבעון ורשימת זמינות" }, { status: 400 });
   }
 
-  const validStatuses = ["unavailable", "prefer_work", "prefer_not_work"];
-  const workerId = session.worker_id;
+  // Resolve target worker + source based on who is calling.
+  let workerId = session.worker_id;
+  let source: AvailabilitySource = "worker";
+
+  if (session.is_admin) {
+    if (typeof body.worker_id === "string" && body.worker_id) {
+      workerId = body.worker_id;
+      source = "admin";
+    }
+    if (typeof body.source === "string") {
+      if (!AVAILABILITY_SOURCES.includes(body.source as AvailabilitySource)) {
+        return NextResponse.json({ error: "מקור לא תקין" }, { status: 400 });
+      }
+      source = body.source as AvailabilitySource;
+    }
+  } else if (body.worker_id && body.worker_id !== session.worker_id) {
+    return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+  }
+
   const db = getDb();
 
-  const upsert = db.transaction(() => {
-    // Remove existing availability for this worker/quarter
-    db.prepare("DELETE FROM WorkerAvailability WHERE worker_id = ? AND quarter_id = ?").run(workerId, quarter_id);
+  const quarter = db.prepare("SELECT quarter_id FROM Quarter WHERE quarter_id = ?").get(quarter_id);
+  if (!quarter) {
+    return NextResponse.json({ error: "רבעון לא נמצא" }, { status: 404 });
+  }
 
-    const insert = db.prepare(
-      "INSERT INTO WorkerAvailability (availability_id, worker_id, quarter_id, date, status) VALUES (?, ?, ?, ?, ?)"
-    );
+  const worker = db.prepare("SELECT worker_id FROM Worker WHERE worker_id = ?").get(workerId);
+  if (!worker) {
+    return NextResponse.json({ error: "עובד לא נמצא" }, { status: 404 });
+  }
 
-    for (const entry of entries) {
-      if (!validStatuses.includes(entry.status)) continue;
-      insert.run(uuid(), workerId, quarter_id, entry.date, entry.status);
-    }
-  });
+  // Validate up front so a bad payload fails whole rather than half-applying.
+  const invalid = validateEntries(entries);
+  if (invalid) {
+    return NextResponse.json({ error: invalid }, { status: 400 });
+  }
 
-  upsert();
+  db.transaction(() => {
+    replaceAvailability(db, { workerId, quarterId: quarter_id, source, entries });
+  })();
 
-  const result = db
-    .prepare("SELECT * FROM WorkerAvailability WHERE worker_id = ? AND quarter_id = ? ORDER BY date")
-    .all(workerId, quarter_id);
-
-  return NextResponse.json(result);
+  return NextResponse.json(readAvailability(db, workerId, quarter_id));
 }

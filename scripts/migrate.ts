@@ -129,8 +129,17 @@ for (const sql of [
   "ALTER TABLE Worker ADD COLUMN branch TEXT",
   "ALTER TABLE Worker ADD COLUMN team TEXT",
   "ALTER TABLE Worker ADD COLUMN phone TEXT",
+  "ALTER TABLE Worker ADD COLUMN in_whatsapp_group INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE ShiftAssignment ADD COLUMN role TEXT NOT NULL DEFAULT 'shift'",
   "ALTER TABLE JusticeChart ADD COLUMN weekend_shifts INTEGER NOT NULL DEFAULT 0",
+  // Provenance for availability rows. 'worker' = self-reported through /worker,
+  // 'form_import' = parsed from a Google Forms constraint file, 'admin' = set
+  // manually by an admin. The worker's own save only clears its own rows, so an
+  // admin import is never silently wiped.
+  "ALTER TABLE WorkerAvailability ADD COLUMN source TEXT NOT NULL DEFAULT 'worker'",
+  // Original free-text snippet that produced the row ("חתונה של אחי"), shown to
+  // the scheduler alongside the warning.
+  "ALTER TABLE WorkerAvailability ADD COLUMN note TEXT",
 ]) {
   try {
     db.exec(sql);

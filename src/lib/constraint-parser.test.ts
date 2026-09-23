@@ -373,6 +373,211 @@ describe("coverage reporting", () => {
   });
 });
 
+describe("sample 10 — day + Hebrew month name, onward phrasing", () => {
+  const Q4: { start_date: string; end_date: string } = {
+    start_date: "2026-10-01",
+    end_date: "2026-12-31",
+  };
+
+  const text = `קקת מ9 בנובמבר והלאה
+יום מכין ב20 באוקטובר
+הכנה מה27 באוקטובר`;
+
+  const parsed = parseConstraints(text, Q4);
+
+  it("resolves a bare day+month-name mention to that exact date, not the whole month", () => {
+    const oct20 = findChip(parsed, "ב20 באוקטובר");
+    assert.deepEqual(oct20.dates, ["2026-10-20"]);
+    assert.equal(oct20.flags.some((f) => f.kind === "whole_month"), false);
+  });
+
+  it("keeps two different days in the same month distinct", () => {
+    const oct27 = findChip(parsed, "מה27 באוקטובר");
+    assert.deepEqual(oct27.dates, ["2026-10-27"]);
+  });
+
+  it("anchors 'from X onward' to the stated date, flagged for admin review", () => {
+    const chip = findChip(parsed, "מ9 בנובמבר");
+    assert.deepEqual(chip.dates, ["2026-11-09"]);
+    assert.ok(chip.flags.some((f) => f.kind === "open_ended"));
+  });
+
+  it("parses a day+month-name range across two named months", () => {
+    const parsed2 = parseConstraints("מ-27 באוקטובר עד 3 בנובמבר", Q4);
+    const chip = chipsOf(parsed2)[0];
+    assert.equal(chip.rawStart, "2026-10-27");
+    assert.equal(chip.rawEnd, "2026-11-03");
+    assert.equal(chip.isRange, true);
+  });
+
+  it("parses a day-day range naming the month once", () => {
+    const parsed2 = parseConstraints("27-29 באוקטובר", Q4);
+    assert.deepEqual(chipsOf(parsed2)[0].dates, [
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+    ]);
+  });
+});
+
+describe("sample 11 — numbered list glued onto dates", () => {
+  const Q4: { start_date: string; end_date: string } = {
+    start_date: "2026-10-01",
+    end_date: "2026-12-31",
+  };
+
+  const text = `1.6.10 מברון
+2.7-14.10 חופש חו"ל
+3.21.10 חתונה
+4.5.10 מברון
+5.10.10 חתונה
+6.26.11 מברון
+7.2.12 חתונה`;
+
+  const parsed = parseConstraints(text, Q4);
+
+  it("strips the list number instead of reading it as part of the date", () => {
+    assert.deepEqual(findChip(parsed, "6.10").dates, ["2026-10-06"]);
+    assert.deepEqual(findChip(parsed, "21.10").dates, ["2026-10-21"]);
+    assert.deepEqual(findChip(parsed, "5.10").dates, ["2026-10-05"]);
+    assert.deepEqual(findChip(parsed, "10.10").dates, ["2026-10-10"]);
+    assert.deepEqual(findChip(parsed, "26.11").dates, ["2026-11-26"]);
+  });
+
+  it("does not misread '7.2.12' as day 7 / month 2 (outside the quarter)", () => {
+    const chip = findChip(parsed, "2.12");
+    assert.deepEqual(chip.dates, ["2026-12-02"]);
+    assert.equal(chip.flags.some((f) => f.kind === "outside_quarter"), false);
+  });
+
+  it("resolves a marker glued onto a RANGE too, using the confirmed markers around it", () => {
+    // "2.7-14.10" alone has the same shape as a genuine "D.M-D.M" range (e.g.
+    // "30.7-3.8"), so it isn't safe to strip in isolation — but markers 1, 3,
+    // 4, 5, 6 elsewhere in this same text already confirm it's a numbered
+    // list, and "2" slots exactly between confirmed 1 and 3.
+    const chip = findChip(parsed, "7-14.10");
+    assert.deepEqual(chip.dates, [
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+    ]);
+    assert.equal(chip.flags.length, 0);
+  });
+
+  it("finds all seven mentions", () => {
+    assert.equal(chipsOf(parsed).length, 7);
+  });
+});
+
+describe("sample 11b — numbered list with a space (even doubled) after the dot", () => {
+  // Real submission: "1. 6.10 ..." and even "3.  21.10 ..." (double space).
+  // The date regexes already tolerate whitespace around their own
+  // separators, so a plain "\d\." glued check isn't enough — the marker
+  // must be stripped whether or not (and however much) whitespace follows.
+  const Q4: { start_date: string; end_date: string } = {
+    start_date: "2026-10-01",
+    end_date: "2026-12-31",
+  };
+
+  const text = `1. 6.10 מבחן
+2. 7-14.10 חופש חו"ל
+3.  21.10 חתונה
+4.  5.10 מבחן
+5. 10.10 חתונה
+5.  26.11 מבחן
+6.  2.12 חתונה`;
+
+  const parsed = parseConstraints(text, Q4);
+
+  it("strips a single-space marker", () => {
+    assert.deepEqual(findChip(parsed, "6.10").dates, ["2026-10-06"]);
+    assert.deepEqual(findChip(parsed, "10.10").dates, ["2026-10-10"]);
+  });
+
+  it("also resolves the marker-glued-onto-a-range line via list context", () => {
+    assert.deepEqual(findChip(parsed, "7-14.10").dates, [
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+    ]);
+  });
+
+  it("strips a double-space marker just as well", () => {
+    assert.deepEqual(findChip(parsed, "21.10").dates, ["2026-10-21"]);
+    assert.deepEqual(findChip(parsed, "5.10").dates, ["2026-10-05"]);
+    assert.deepEqual(findChip(parsed, "26.11").dates, ["2026-11-26"]);
+    assert.deepEqual(findChip(parsed, "2.12").dates, ["2026-12-02"]);
+  });
+
+  it("finds all seven mentions with nothing left over", () => {
+    assert.equal(chipsOf(parsed).length, 7);
+    assert.deepEqual(parsed.leftover, []);
+  });
+});
+
+describe("sample 11c — a range's own day doesn't get mistaken for a marker", () => {
+  it("leaves a genuine long range alone when it doesn't fit the confirmed sequence", () => {
+    // Two confirmed markers (1, 2) establish list context, but this range's
+    // leading day (21) is nowhere near that sequence, so it must NOT be
+    // treated as a marker — it's a real (if unusually long) request.
+    const Q4: { start_date: string; end_date: string } = {
+      start_date: "2026-10-01",
+      end_date: "2026-12-31",
+    };
+    const text = `1. 6.10 מבחן
+2. 5.10 מבחן
+21.8-13.10 חופש`;
+    const parsed = parseConstraints(text, Q4);
+    const chip = findChip(parsed, "21.8-13.10");
+    assert.equal(chip.rawStart, "2026-08-21");
+    assert.equal(chip.rawEnd, "2026-10-13");
+  });
+});
+
+describe("sample 12 — a lone leading number is left as a real date", () => {
+  it("does not strip '5.' from a single non-list '5.10' date", () => {
+    const Q4: { start_date: string; end_date: string } = {
+      start_date: "2026-10-01",
+      end_date: "2026-12-31",
+    };
+    const parsed = parseConstraints("5.10 חופש", Q4);
+    assert.deepEqual(parsed.allDates, ["2026-10-05"]);
+  });
+
+  it("does not corrupt a real multi-line list of plain ranges (no list numbering)", () => {
+    // Regression: "25.10-3.11" and "12.11-22.11" each start with a two-digit
+    // day immediately followed by a dot, the same shape a glued list marker
+    // would have — they must be read as genuine ranges, not have their
+    // leading day mistaken for a marker and stripped off.
+    const Q4: { start_date: string; end_date: string } = {
+      start_date: "2026-10-01",
+      end_date: "2026-12-31",
+    };
+    const text = `25.10-3.11
+5.11
+12.11-22.11
+26.11
+16.12-21.12`;
+    const parsed = parseConstraints(text, Q4);
+
+    assert.equal(findChip(parsed, "25.10-3.11").rawStart, "2026-10-25");
+    assert.equal(findChip(parsed, "25.10-3.11").rawEnd, "2026-11-03");
+
+    assert.equal(findChip(parsed, "12.11-22.11").rawStart, "2026-11-12");
+    assert.equal(findChip(parsed, "12.11-22.11").rawEnd, "2026-11-22");
+  });
+});
+
 describe("edge cases", () => {
   it("returns an empty result for blank input", () => {
     const parsed = parseConstraints("   \n  \n", Q3);

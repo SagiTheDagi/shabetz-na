@@ -6,28 +6,50 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { 
-  AlertTriangle, 
-  Check, 
-  ChevronDown, 
-  ChevronUp, 
-  Calendar, 
-  FileText, 
-  Sparkles, 
-  Clock, 
-  X, 
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  FileText,
+  Sparkles,
+  Clock,
+  X,
   RefreshCw,
-  Info
+  Info,
+  Pencil,
+  RotateCcw
 } from "lucide-react";
-import { 
-  parseConstraints, 
-  computeCoverage, 
-  type ParsedConstraints, 
+import {
+  parseConstraints,
+  computeCoverage,
+  type ParsedConstraints,
+  type ConstraintChip,
   type ConstraintPolarity,
-  type QuarterBounds 
+  type QuarterBounds
 } from "@/lib/constraint-parser";
-import { toShortDate, hebrewDayName } from "@/lib/date-utils";
+import { toShortDate, hebrewDayName, enumerateDates } from "@/lib/date-utils";
 import type { Quarter } from "@/lib/types";
+
+interface ChipOverride {
+  start: string;
+  end: string;
+}
+
+/** Dates for a chip, honouring a manual range override if the admin set one. */
+function effectiveDates(
+  chip: ConstraintChip,
+  override: ChipOverride | undefined,
+  quarterBounds: QuarterBounds | null
+): string[] {
+  if (!override) return chip.dates;
+  if (!quarterBounds) return [];
+  const start = override.start < quarterBounds.start_date ? quarterBounds.start_date : override.start;
+  const end = override.end > quarterBounds.end_date ? quarterBounds.end_date : override.end;
+  if (end < start) return [];
+  return enumerateDates(start, end);
+}
 
 interface WorkerOption {
   worker_id: string;
@@ -48,12 +70,13 @@ interface FormRow {
   // Custom user overrides per row
   blockPolarities: Record<number, ConstraintPolarity>;
   disabledChips: Record<string, boolean>; // key: "blockIdx:chipIdx"
+  chipOverrides: Record<string, ChipOverride>; // key: "blockIdx:chipIdx"
   includeRecurring: boolean;
   includeLeftover: boolean;
   expanded: boolean;
 }
 
-function parseFormBuffer(buffer: ArrayBuffer, isCsv: boolean): Omit<FormRow, "blockPolarities" | "disabledChips" | "includeRecurring" | "includeLeftover" | "expanded">[] {
+function parseFormBuffer(buffer: ArrayBuffer, isCsv: boolean): Omit<FormRow, "blockPolarities" | "disabledChips" | "chipOverrides" | "includeRecurring" | "includeLeftover" | "expanded">[] {
   const wb = isCsv
     ? XLSX.read(new TextDecoder("utf-8").decode(buffer).replace(/^﻿/, ""), { type: "string" })
     : XLSX.read(buffer, { type: "array" });
@@ -188,6 +211,7 @@ export function FormResponseImport() {
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [rows, setRows] = useState<FormRow[]>([]);
   const [importing, setImporting] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
 
   // Fetch initial data
   useEffect(() => {
@@ -247,6 +271,7 @@ export function FormResponseImport() {
     };
   }, [activeQuarterObj]);
 
+
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -269,6 +294,7 @@ export function FormResponseImport() {
         workerId: autoId,
         blockPolarities: {},
         disabledChips: {},
+        chipOverrides: {},
         includeRecurring: true,
         includeLeftover: true,
         expanded: false,
@@ -295,13 +321,14 @@ export function FormResponseImport() {
     const map = new Map<number, ParsedConstraints>();
     for (const r of rows) {
       if (!r.constraints) continue;
-      const res = parseConstraints(r.constraints, quarterBounds, {
-        shiftDates: shiftDates.length > 0 ? shiftDates : undefined,
-      });
+      // Deliberately not restricted to existing shift dates: a worker's
+      // stated unavailability should be recorded for every requested date in
+      // the quarter, even ones without a shift yet (one may be added later).
+      const res = parseConstraints(r.constraints, quarterBounds);
       map.set(r.id, res);
     }
     return map;
-  }, [rows, quarterBounds, shiftDates]);
+  }, [rows, quarterBounds]);
 
   // Overall summary statistics
   const summary = useMemo(() => {
@@ -317,9 +344,11 @@ export function FormResponseImport() {
       let workerDatesCount = 0;
       parsed.blocks.forEach((block, bIdx) => {
         block.chips.forEach((chip, cIdx) => {
-          if (r.disabledChips[`${bIdx}:${cIdx}`]) return;
-          workerDatesCount += chip.dates.length;
-          totalFlags += chip.flags.length;
+          const key = `${bIdx}:${cIdx}`;
+          if (r.disabledChips[key]) return;
+          const override = r.chipOverrides[key];
+          workerDatesCount += effectiveDates(chip, override, quarterBounds).length;
+          if (!override) totalFlags += chip.flags.length;
         });
       });
 
@@ -334,7 +363,7 @@ export function FormResponseImport() {
       totalFlags,
       totalWorkersWithDates,
     };
-  }, [rows, parsedRowsData]);
+  }, [rows, parsedRowsData, quarterBounds]);
 
   async function handleImport() {
     if (!selectedQuarter) {
@@ -370,8 +399,10 @@ export function FormResponseImport() {
         parsed.blocks.forEach((block, bIdx) => {
           const polarity = row.blockPolarities[bIdx] ?? block.polarity;
           block.chips.forEach((chip, cIdx) => {
-            if (row.disabledChips[`${bIdx}:${cIdx}`]) return;
-            for (const d of chip.dates) {
+            const key = `${bIdx}:${cIdx}`;
+            if (row.disabledChips[key]) return;
+            const dates = effectiveDates(chip, row.chipOverrides[key], quarterBounds);
+            for (const d of dates) {
               entriesForWorker.push({
                 date: d,
                 status: polarity,
@@ -461,6 +492,7 @@ export function FormResponseImport() {
       toast.success(
         `עודכנו ${toImport.length} עובדים (${totalEntriesCount} תאריכי אילוצים יובאו ברבעון ${selectedQuarter})`
       );
+      setRows([]);
     } catch (error) {
       toast.error("שגיאת רשת בעת ייבוא האילוצים");
       console.error("Import error:", error);
@@ -692,6 +724,10 @@ export function FormResponseImport() {
                                 {block.chips.map((chip, cIdx) => {
                                   const key = `${bIdx}:${cIdx}`;
                                   const disabled = !!row.disabledChips[key];
+                                  const override = row.chipOverrides[key];
+                                  const dates = effectiveDates(chip, override, quarterBounds);
+                                  const editKey = `${row.id}:${key}`;
+                                  const isEditing = editingKey === editKey;
 
                                   return (
                                     <div
@@ -721,10 +757,15 @@ export function FormResponseImport() {
                                         </button>
 
                                         <span className="font-medium font-mono">
-                                          {chip.dates.length > 0 ? (
-                                            chip.isRange ? `${toShortDate(chip.dates[0])} - ${toShortDate(chip.dates.at(-1)!)} (${chip.dates.length} ימים)` : `${toShortDate(chip.dates[0])} (${hebrewDayName(chip.dates[0])})`
+                                          {dates.length > 0 ? (
+                                            dates.length > 1
+                                              ? `${toShortDate(dates[0])} - ${toShortDate(dates.at(-1)!)} (${dates.length} ימים)`
+                                              : `${toShortDate(dates[0])} (${hebrewDayName(dates[0])})`
                                           ) : (
-                                            chip.matchedText
+                                            <>
+                                              {chip.matchedText}
+                                              <span className="nocturne-text-muted font-normal"> · אין משמרות בטווח</span>
+                                            </>
                                           )}
                                         </span>
 
@@ -733,10 +774,73 @@ export function FormResponseImport() {
                                             • {chip.reason}
                                           </span>
                                         )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingKey(isEditing ? null : editKey)}
+                                          className="p-0.5 rounded hover:bg-white/10 mr-auto"
+                                          title="ערוך טווח תאריכים"
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
                                       </div>
 
+                                      {/* Manual range editor */}
+                                      {isEditing && (
+                                        <div className="flex items-center gap-1 pt-1 border-t border-white/10">
+                                          <input
+                                            type="date"
+                                            value={override?.start ?? chip.rawStart}
+                                            onChange={(e) =>
+                                              updateRow(row.id, {
+                                                chipOverrides: {
+                                                  ...row.chipOverrides,
+                                                  [key]: { start: e.target.value, end: override?.end ?? chip.rawEnd },
+                                                },
+                                              })
+                                            }
+                                            className="text-[10px] bg-white/[0.03] border border-white/10 rounded px-1 py-0.5 w-[112px]"
+                                          />
+                                          <span>-</span>
+                                          <input
+                                            type="date"
+                                            value={override?.end ?? chip.rawEnd}
+                                            onChange={(e) =>
+                                              updateRow(row.id, {
+                                                chipOverrides: {
+                                                  ...row.chipOverrides,
+                                                  [key]: { start: override?.start ?? chip.rawStart, end: e.target.value },
+                                                },
+                                              })
+                                            }
+                                            className="text-[10px] bg-white/[0.03] border border-white/10 rounded px-1 py-0.5 w-[112px]"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const next = { ...row.chipOverrides };
+                                              delete next[key];
+                                              updateRow(row.id, { chipOverrides: next });
+                                              setEditingKey(null);
+                                            }}
+                                            className="p-0.5 rounded hover:bg-white/10 nocturne-text-muted"
+                                            title="אפס לפענוח האוטומטי"
+                                          >
+                                            <RotateCcw className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {/* Manual-override badge, replaces the auto flags once reviewed */}
+                                      {override && !disabled && (
+                                        <div className="flex items-center gap-1 pt-0.5 border-t border-white/10 text-[10px] text-blue-400">
+                                          <Pencil className="h-2.5 w-2.5 shrink-0" />
+                                          טווח נערך ידנית — אין צורך באישור
+                                        </div>
+                                      )}
+
                                       {/* Flags / Warnings on Chip */}
-                                      {chip.flags.length > 0 && !disabled && (
+                                      {chip.flags.length > 0 && !disabled && !override && (
                                         <div className="flex flex-col gap-0.5 pt-0.5 border-t border-white/10">
                                           {chip.flags.map((flag, fIdx) => (
                                             <span

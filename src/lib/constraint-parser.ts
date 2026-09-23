@@ -145,8 +145,29 @@ const DAY_RANGE_RE = /(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*[./]\s*(\d{1,2})(?:\s*
 /** 11.7 · 30.06 · 12/07 */
 const SINGLE_RE = /(\d{1,2})\s*[./]\s*(\d{1,2})(?:\s*[./]\s*(\d{2,4}))?/g;
 
-const MONTH_RE = new RegExp(
-  `[במלה]?(${Object.keys(HEBREW_MONTH_TO_NUMBER).join("|")})`,
+const MONTH_NAMES_ALT = Object.keys(HEBREW_MONTH_TO_NUMBER).join("|");
+
+const MONTH_RE = new RegExp(`[במלה]?(${MONTH_NAMES_ALT})`, "g");
+
+// Hebrew glues a preposition directly onto the day number ("ב20", "מה27", "מ9").
+const DATE_PREFIX = `[והבמלכ]{0,2}`;
+
+/** מ-27 באוקטובר עד 3 בנובמבר — day+month-name on both sides of a range. */
+const FULL_RANGE_NAME_RE = new RegExp(
+  `${DATE_PREFIX}(\\d{1,2})\\s*[-–—]?\\s*[במלה]?(${MONTH_NAMES_ALT})\\s*(?:[-–—]|עד)\\s*` +
+    `${DATE_PREFIX}(\\d{1,2})\\s*[-–—]?\\s*[במלה]?(${MONTH_NAMES_ALT})`,
+  "g"
+);
+
+/** 27-29 באוקטובר — day range, month named once on the right. */
+const DAY_RANGE_NAME_RE = new RegExp(
+  `${DATE_PREFIX}(\\d{1,2})\\s*[-–—]\\s*(\\d{1,2})\\s*[במלה]?(${MONTH_NAMES_ALT})`,
+  "g"
+);
+
+/** 27 באוקטובר · ב20 באוקטובר · מ9 בנובמבר — a single day+month-name mention. */
+const SINGLE_NAME_RE = new RegExp(
+  `${DATE_PREFIX}(\\d{1,2})\\s*[-–—]?\\s*[במלה]?(${MONTH_NAMES_ALT})`,
   "g"
 );
 
@@ -156,6 +177,61 @@ const WEEKDAY_RE = new RegExp(
 );
 
 const RECURRING_CONTEXT = /ימי|ימים|כל\s+יום/;
+
+/**
+ * Respondents often number their list ("1. ...", "2. ..."). The date regexes
+ * tolerate whitespace around their separators (so they can read "1.7 - 3.7"),
+ * which means a list marker gets swallowed into the following date whether
+ * it's glued on directly ("6.2.12") or has a space (even a doubled one)
+ * after the dot ("6.  2.12") — both read as day 6, month 2, instead of
+ * "list item 6, date 2.12".
+ *
+ * Pass 1 only trusts a marker directly followed by a plain D.M date (no
+ * dash) — that shape is unambiguous. A dash right after the marker's digits
+ * ("2. 7-14.10") is NOT unambiguous on its own: it looks exactly like a
+ * genuine range ("30.7-3.8", 30 July - 3 August), so pass 1 leaves it alone.
+ *
+ * Pass 2 revisits those skipped lines using context pass 1 already
+ * confirmed: once at least two OTHER lines have unambiguously confirmed this
+ * text is a numbered list (e.g. markers 1, 3, 4 found elsewhere), a skipped
+ * line whose own leading number slots into that same ascending sequence
+ * (e.g. "2." between confirmed 1 and 3) is confidently a marker too, range
+ * or not — the surrounding list is the disambiguating signal a single line
+ * can't provide by itself. This only ever fires when the line is SANDWICHED
+ * between a confirmed marker on both sides — an unbounded tail (nothing
+ * confirmed after it) must never be trusted, or a genuine long trailing
+ * range (e.g. "21.8-13.10") would get its leading day mistaken for a marker
+ * with nothing to cap how large a "marker" it's allowed to be.
+ */
+function stripListMarkers(lines: string[]): string[] {
+  const TRIPLE_RE = /^(\d{1,2})\.\s*(\d{1,2}\.\d{1,2})(?!\d)/;
+  const ANY_MARKER_RE = /^(\d{1,2})\.\s*(?=\d)/;
+
+  const confirmed: (number | null)[] = lines.map((line) => {
+    const m = line.trimStart().match(TRIPLE_RE);
+    return m ? Number(m[1]) : null;
+  });
+
+  if (confirmed.filter((n) => n !== null).length < 2) return lines;
+
+  return lines.map((line, i) => {
+    const trimmed = line.trimStart();
+
+    if (confirmed[i] !== null) {
+      return trimmed.slice(String(confirmed[i]).length + 1);
+    }
+
+    const m = trimmed.match(ANY_MARKER_RE);
+    if (!m) return line;
+
+    const beforeIdx = confirmed.slice(0, i).map((v, j) => ({ v, j })).filter((e) => e.v !== null).at(-1);
+    const afterIdx = confirmed.findIndex((v, j) => j > i && v !== null);
+    if (!beforeIdx || afterIdx === -1) return line;
+
+    const n = Number(m[1]);
+    return n >= beforeIdx.v! && n <= confirmed[afterIdx]! ? trimmed.slice(m[0].length) : line;
+  });
+}
 
 // ---- Thresholds ----
 
@@ -358,6 +434,27 @@ function extractDateMatches(line: string, quarter: QuarterBounds): RawMatch[] {
     return { startIso: a.iso, endIso: a.iso, outside: a.outside };
   });
 
+  collect(FULL_RANGE_NAME_RE, (m) => {
+    const a = inferYear(Number(m[1]), HEBREW_MONTH_TO_NUMBER[m[2]], quarter);
+    const b = inferYear(Number(m[3]), HEBREW_MONTH_TO_NUMBER[m[4]], quarter);
+    if (!a || !b) return null;
+    return { startIso: a.iso, endIso: b.iso, outside: a.outside && b.outside };
+  });
+
+  collect(DAY_RANGE_NAME_RE, (m) => {
+    const month = HEBREW_MONTH_TO_NUMBER[m[3]];
+    const a = inferYear(Number(m[1]), month, quarter);
+    const b = inferYear(Number(m[2]), month, quarter);
+    if (!a || !b) return null;
+    return { startIso: a.iso, endIso: b.iso, outside: a.outside && b.outside };
+  });
+
+  collect(SINGLE_NAME_RE, (m) => {
+    const a = inferYear(Number(m[1]), HEBREW_MONTH_TO_NUMBER[m[2]], quarter);
+    if (!a) return null;
+    return { startIso: a.iso, endIso: a.iso, outside: a.outside };
+  });
+
   matches.sort((x, y) => x.start - y.start);
   return matches;
 }
@@ -446,7 +543,7 @@ export function parseConstraints(
     return { blocks: [], recurringWeekdays: [], recurringText: null, leftover: [], allDates: [] };
   }
 
-  const lines = normalize(text).split("\n");
+  const lines = stripListMarkers(normalize(text).split("\n"));
 
   let current: ConstraintBlock = {
     headerText: null,
@@ -518,16 +615,26 @@ export function parseConstraints(
     for (const dm of dateMatches) residue = mask(residue, dm.start, dm.end);
     const reason = stripReason(residue);
 
-    const openEnded = /(^|\s)עד\s*ה?\d/.test(line) && dateMatches.every((d) => !d.isRange);
+    const openEndedBackward =
+      /(^|\s)עד\s*ה?\d/.test(line) && dateMatches.every((d) => !d.isRange);
+    const openEndedForward =
+      /ואילך|והלאה/.test(line) && dateMatches.length > 0 && dateMatches.every((d) => !d.isRange);
 
     if (dateMatches.length > 0) {
       for (const dm of dateMatches) {
         const extraFlags: ConstraintFlag[] = [];
-        if (openEnded) {
+        if (openEndedBackward) {
           extraFlags.push({
             kind: "open_ended",
             severity: "warning",
             message: 'נוסח פתוח ("עד ...") — ודא את טווח התאריכים',
+          });
+        }
+        if (openEndedForward) {
+          extraFlags.push({
+            kind: "open_ended",
+            severity: "warning",
+            message: 'נוסח פתוח ("ואילך"/"והלאה") — ודא את תאריך הסיום',
           });
         }
         current.chips.push(

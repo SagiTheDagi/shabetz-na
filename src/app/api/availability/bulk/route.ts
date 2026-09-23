@@ -60,17 +60,18 @@ export async function POST(req: Request) {
 
   // Validate everything before touching the DB — a bad row must not leave a
   // half-finished import behind.
-  const knownWorker = db.prepare("SELECT worker_id FROM Worker WHERE worker_id = ?");
+  const knownWorker = db.prepare("SELECT name FROM Worker WHERE worker_id = ?");
 
   for (const w of workers) {
     if (!w || typeof w.worker_id !== "string" || !Array.isArray(w.entries)) {
       return NextResponse.json({ error: "מבנה נתונים לא תקין" }, { status: 400 });
     }
-    if (!knownWorker.get(w.worker_id)) {
+    const worker = knownWorker.get(w.worker_id) as { name: string } | undefined;
+    if (!worker) {
       return NextResponse.json({ error: `עובד לא נמצא: ${w.worker_id}` }, { status: 404 });
     }
 
-    const invalid = validateEntries(w.entries, w.worker_id);
+    const invalid = validateEntries(w.entries, `${worker.name} (${w.worker_id})`);
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
     }

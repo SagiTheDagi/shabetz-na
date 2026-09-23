@@ -214,7 +214,7 @@ export function WorkerDetailPopover({
               variant="outline"
               size="sm"
               className="h-7 text-xs px-2"
-              onClick={() => router.push("/admin/settings?tab=workers")}
+              onClick={() => router.push(`/admin/workers?worker=${encodeURIComponent(worker.worker_id)}`)}
             >
               <Pencil className="size-3.5" />
               ערוך פרופיל

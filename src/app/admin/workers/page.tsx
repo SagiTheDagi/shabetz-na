@@ -3,6 +3,10 @@
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, MessageCircle, AlertTriangle, Check, X, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PotentialExport } from "@/components/potential-export";
+import { WorkerImport } from "@/components/worker-import";
 import { InspectorPanel, InspectorWorkerData } from "@/components/inspector-panel";
 import {
   DropdownMenu,
@@ -34,12 +38,16 @@ export default function WorkersPage() {
 function WorkersPageContent() {
   const searchParams = useSearchParams();
   const initialFilter = searchParams.get("filter");
+  const initialSearch = searchParams.get("search") ?? "";
+  const initialWorkerId = searchParams.get("worker");
   
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   
   // Filters
   const [showExempt, setShowExempt] = useState(true);
@@ -48,6 +56,11 @@ function WorkersPageContent() {
     initialFilter === "no-whatsapp" ? "out" : "all"
   );
   const [selectedRanks, setSelectedRanks] = useState<string[]>([]);
+
+  async function reloadWorkers() {
+    const res = await fetch("/api/workers?include_exempt=true&include_archived=true");
+    setWorkers(await res.json());
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -60,12 +73,34 @@ function WorkersPageContent() {
       const ranksData = await ranksRes.json();
       
       setWorkers(workersData);
+      if (initialWorkerId) {
+        const target = workersData.find((w: Worker) => w.worker_id === initialWorkerId);
+        if (target) setSelectedWorker(target);
+      }
       setRanks(ranksData);
       setLoading(false);
     }
     
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function updateUrlParam(key: string, value: string | null) {
+    const url = new URL(window.location.href);
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+    window.history.replaceState(null, "", url);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    updateUrlParam("search", value || null);
+  }
+
+  function selectWorker(worker: Worker | null) {
+    setSelectedWorker(worker);
+    updateUrlParam("worker", worker?.worker_id ?? null);
+  }
 
   const filteredWorkers = useMemo(() => {
     return workers.filter((w) => {
@@ -157,6 +192,14 @@ function WorkersPageContent() {
               </span>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+              ייצוא פוטנציאלים
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              ייבוא עובדים
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -168,7 +211,7 @@ function WorkersPageContent() {
               type="text"
               placeholder="חיפוש לפי שם, מספר אישי או טלפון..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full h-9 pr-10 pl-3 rounded-lg text-[13px] nocturne-surface border border-white/5 focus:border-white/10 focus:outline-none"
             />
           </div>
@@ -280,7 +323,7 @@ function WorkersPageContent() {
               {filteredWorkers.map((worker) => (
                 <tr
                   key={worker.worker_id}
-                  onClick={() => setSelectedWorker(worker)}
+                  onClick={() => selectWorker(worker)}
                   className={`text-[13px] border-b border-white/5 cursor-pointer transition-colors hover:bg-white/[0.02] ${
                     selectedWorker?.worker_id === worker.worker_id ? "bg-white/[0.04]" : ""
                   }`}
@@ -354,13 +397,30 @@ function WorkersPageContent() {
         </div>
       </div>
 
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) reloadWorkers();
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>ייבוא עובדים מקובץ</DialogTitle>
+          </DialogHeader>
+          <WorkerImport />
+        </DialogContent>
+      </Dialog>
+
+      <PotentialExport open={exportOpen} onClose={() => setExportOpen(false)} />
+
       {/* Inspector Panel */}
       {selectedWorker && (
         <div className="fixed top-0 left-0 w-80 h-full z-10">
           <InspectorPanel
             type="worker"
             worker={selectedWorker}
-            onClose={() => setSelectedWorker(null)}
+            onClose={() => selectWorker(null)}
             editable={true}
             onWorkerUpdate={(updatedWorker) => {
               // Update the worker in the list

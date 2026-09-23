@@ -243,7 +243,7 @@ export default function AdminDashboard() {
           </Link>
           
           <Link 
-            href="/admin/settings?tab=workers"
+            href="/admin/workers"
             className="flex items-center gap-2.5 py-[7px] px-2 rounded-lg transition-colors hover:bg-white/5"
           >
             <span className="w-[26px] h-[26px] rounded-[7px] grid place-items-center text-[11px] nocturne-accent-muted nocturne-accent-light">

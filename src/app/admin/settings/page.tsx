@@ -8,6 +8,8 @@ import { RankManager } from "@/components/rank-manager";
 import { ShiftTypeManager } from "@/components/shift-type-manager";
 import { ShiftDateImport } from "@/components/shift-date-import";
 import { FormResponseImport } from "@/components/form-response-import";
+import { MobileShiftDates } from "@/components/mobile/shift-dates-mobile";
+import { useIsMobile } from "@/lib/use-media";
 
 const TAB_VALUES = new Set([
   "form-responses",
@@ -17,6 +19,7 @@ const TAB_VALUES = new Set([
 ]);
 
 function SettingsTabs() {
+  const isMobile = useIsMobile();
   const params = useSearchParams();
   const tabParam = params.get("tab");
   // Honor a ?tab= query param (e.g. deep links from the assign page).
@@ -27,7 +30,7 @@ function SettingsTabs() {
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as string)} dir="rtl">
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="form-responses">ייבוא אילוצים</TabsTrigger>
           <TabsTrigger value="shift-dates">תאריכי משמרות</TabsTrigger>
           <TabsTrigger value="ranks">דרגות</TabsTrigger>
@@ -43,7 +46,7 @@ function SettingsTabs() {
         </TabsContent>
 
         <TabsContent value="shift-dates">
-          <ShiftDateImport />
+          {isMobile ? <MobileShiftDates /> : <ShiftDateImport />}
         </TabsContent>
 
         <TabsContent value="ranks">

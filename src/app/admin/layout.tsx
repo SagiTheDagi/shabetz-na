@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
+import { MobileTabBar } from "@/components/mobile/tab-bar";
 import type { SessionPayload, Quarter } from "@/lib/types";
 
 interface NavSection {
@@ -60,6 +62,7 @@ function getPageTitle(pathname: string): { title: string; subtitle?: string } {
   if (pathname.startsWith("/admin/workers")) return { title: "עובדים", subtitle: "ניהול רשימת עובדים" };
   if (pathname.startsWith("/admin/eligibility")) return { title: "מטריצת כשירות", subtitle: "הגדרת כשירות לפי דרגה" };
   if (pathname.startsWith("/admin/justice")) return { title: "טבלת צדק", subtitle: "חלוקה הוגנת של משמרות" };
+  if (pathname.startsWith("/admin/more")) return { title: "עוד" };
   if (pathname.startsWith("/admin/settings")) return { title: "הגדרות", subtitle: "ניהול המערכת" };
   return { title: "ניהול" };
 }
@@ -103,9 +106,11 @@ export default function AdminLayout({
       .catch(() => {});
   }, [router]);
 
+  useEffect(() => subscribeQuarter(setCurrentQuarter), []);
+
   function handleQuarterChange(quarterId: string) {
     setCurrentQuarter(quarterId);
-    localStorage.setItem("selectedQuarter", quarterId);
+    setStoredQuarter(quarterId);
   }
 
   async function handleLogout() {
@@ -116,9 +121,9 @@ export default function AdminLayout({
   const pageInfo = getPageTitle(pathname);
 
   return (
-    <div className="flex h-screen text-sm nocturne-bg nocturne-text">
+    <div className="flex h-dvh text-sm nocturne-bg nocturne-text">
       {/* Sidebar - on the right in RTL */}
-      <nav className="w-[var(--sidebar-width)] flex-none flex flex-col gap-0.5 py-4 px-2.5 border-l nocturne-sidebar nocturne-border">
+      <nav className="hidden md:flex w-[var(--sidebar-width)] flex-none flex-col gap-0.5 py-4 px-2.5 border-l nocturne-sidebar nocturne-border">
         {/* Brand */}
         <div className="px-2 pb-3.5">
           <div className="text-[19px] font-semibold tracking-tight">
@@ -179,10 +184,10 @@ export default function AdminLayout({
       {/* Main content area */}
       <main className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
-        <header className="h-14 flex-none flex items-center gap-3.5 px-[22px] border-b nocturne-border">
+        <header className="h-14 flex-none flex items-center gap-3.5 px-4 md:px-[22px] border-b nocturne-border">
           <h1 className="text-[var(--text-heading)] font-medium m-0">{pageInfo.title}</h1>
           {pageInfo.subtitle && (
-            <span className="text-xs nocturne-text-muted">{pageInfo.subtitle}</span>
+            <span className="hidden md:inline text-xs nocturne-text-muted">{pageInfo.subtitle}</span>
           )}
           
           {/* Right side actions */}
@@ -210,13 +215,13 @@ export default function AdminLayout({
             <Button 
               variant="outline" 
               size="sm" 
-              className="text-xs h-8 px-3 border nocturne-border bg-transparent nocturne-text"
+              className="hidden md:inline-flex text-xs h-8 px-3 border nocturne-border bg-transparent nocturne-text"
             >
               ייצוא
             </Button>
             <Button 
               size="sm"
-              className="text-xs h-8 px-3 bg-transparent border border-primary text-primary"
+              className="hidden md:inline-flex text-xs h-8 px-3 bg-transparent border border-primary text-primary"
             >
               פרסום רבעון
             </Button>
@@ -224,9 +229,10 @@ export default function AdminLayout({
         </header>
 
         {/* Page content */}
-        <div className="flex-1 min-h-0 overflow-auto p-5 px-[22px] pb-7">
+        <div className="flex-1 min-h-0 overflow-auto p-4 md:p-5 md:px-[22px] pb-6 md:pb-7">
           {children}
         </div>
+        <MobileTabBar />
       </main>
     </div>
   );

@@ -67,6 +67,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const fields: string[] = [];
     const values: unknown[] = [];
 
+    if ("name" in body) {
+      fields.push("name = ?");
+      values.push(validateString(body.name, "שם עובד", 100));
+    }
+    if ("rank_id" in body) {
+      const rank_id = validateString(body.rank_id, "דרגה", 20);
+      if (!db.prepare("SELECT rank_id FROM Rank WHERE rank_id = ?").get(rank_id)) {
+        return NextResponse.json({ error: "דרגה לא נמצאה" }, { status: 400 });
+      }
+      fields.push("rank_id = ?");
+      values.push(rank_id);
+    }
+    if ("release_date" in body) {
+      const rd = validateOptionalString(body.release_date, "תאריך שחרור", 10);
+      if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) {
+        return NextResponse.json({ error: "תאריך שחרור לא תקין" }, { status: 400 });
+      }
+      fields.push("release_date = ?");
+      values.push(rd);
+    }
+    if ("is_admin" in body) {
+      fields.push("is_admin = ?");
+      values.push(validateBoolean(body.is_admin));
+    }
+    if (typeof body.password === "string" && body.password.length > 0) {
+      fields.push("password_hash = ?");
+      values.push(await hashPassword(body.password));
+    }
     if ("is_exempt" in body) {
       const exempt = validateBoolean(body.is_exempt);
       fields.push("is_exempt = ?");

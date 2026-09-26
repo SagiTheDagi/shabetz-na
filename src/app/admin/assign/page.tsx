@@ -31,6 +31,9 @@ import { WorkerDetailPopover } from "@/components/worker-detail-popover";
 import type { Quarter, AssignmentWarning } from "@/lib/types";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getStoredQuarter, setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
+import { useIsMobile } from "@/lib/use-media";
+import { MobileAssign } from "@/components/mobile/mobile-assign";
 
 // ---- Interfaces ----
 
@@ -1033,6 +1036,7 @@ function CalendarView({
 // ---- Main Page ----
 
 export default function AssignPage() {
+  const isMobile = useIsMobile();
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [selectedQuarter, setSelectedQuarter] = useState<string>("");
   const [shiftDates, setShiftDates] = useState<ShiftDateRow[]>([]);
@@ -1066,12 +1070,17 @@ export default function AssignPage() {
     const res = await fetch("/api/quarters");
     const data: Quarter[] = await res.json();
     setQuarters(data);
-    if (data.length > 0) setSelectedQuarter(data[0].quarter_id);
+    const saved = getStoredQuarter();
+    if (data.length > 0) {
+      setSelectedQuarter(data.some((q) => q.quarter_id === saved) ? saved! : data[0].quarter_id);
+    }
   }, []);
 
   useEffect(() => {
     loadQuarters();
   }, [loadQuarters]);
+
+  useEffect(() => subscribeQuarter(setSelectedQuarter), []);
 
   useEffect(() => {
     fetch("/api/justice-chart")
@@ -1268,6 +1277,39 @@ export default function AssignPage() {
 
   const selectedShift = shiftDates.find((s) => s.shift_date_id === selectedShiftId);
 
+  const forceModalEl = (
+    <ForceAssignModal
+      open={forceModal.open}
+      onClose={() => setForceModal((p) => ({ ...p, open: false }))}
+      onConfirm={(reason) => {
+        handleAssign(forceModal.shiftDateId, forceModal.workerId, forceModal.role, true, reason);
+        setForceModal((p) => ({ ...p, open: false }));
+      }}
+      warnings={forceModal.warnings}
+      workerName={forceModal.workerName}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        <MobileAssign
+          shifts={shiftDates}
+          assignments={assignments}
+          candidates={workers}
+          selectedShiftId={selectedShiftId}
+          selectedRole={selectedRole}
+          onSelectSlot={handleSelectSlot}
+          onAssign={(workerId) => {
+            if (selectedShiftId) handleAssign(selectedShiftId, workerId, selectedRole);
+          }}
+          onUnassign={handleUnassign}
+        />
+        {forceModalEl}
+      </>
+    );
+  }
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col h-full gap-3">
@@ -1276,7 +1318,11 @@ export default function AssignPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <Select
               value={selectedQuarter}
-              onValueChange={(v) => v && setSelectedQuarter(v)}
+              onValueChange={(v) => {
+                if (!v) return;
+                setSelectedQuarter(v);
+                setStoredQuarter(v);
+              }}
             >
               <SelectTrigger className="w-36">
                 <SelectValue placeholder="רבעון" />

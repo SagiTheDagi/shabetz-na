@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSelectedQuarter } from "@/lib/selected-quarter";
+import { toast } from "sonner";
+import { DateChip } from "@/components/mobile/date-chip";
 
 interface WorkerInfo {
   worker_id: string;
@@ -19,7 +22,16 @@ interface ShiftTypeProgress {
   total: number;
 }
 
+interface NextOpen {
+  shift_date_id: string;
+  date: string;
+  shift_type_name: string;
+  is_weekend: number;
+  missingShift: boolean;
+}
+
 interface DashboardStats {
+  nextOpen: NextOpen[];
   totalWorkers: number;
   exemptWorkers: number;
   totalShifts: number;
@@ -87,7 +99,25 @@ export default function AdminDashboard() {
     notInWhatsappGroup: 0,
     workersNotInWhatsapp: [],
     progressByType: [],
+    nextOpen: [],
   });
+
+  async function markJoined(workerId: string) {
+    const res = await fetch(`/api/workers/${encodeURIComponent(workerId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ in_whatsapp_group: true }),
+    });
+    if (!res.ok) return toast.error("עדכון נכשל");
+    setStats((s) => ({
+      ...s,
+      inWhatsappGroup: s.inWhatsappGroup + 1,
+      notInWhatsappGroup: s.notInWhatsappGroup - 1,
+      workersNotInWhatsapp: s.workersNotInWhatsapp.filter((w) => w.worker_id !== workerId),
+    }));
+  }
+
+  const quarterId = useSelectedQuarter();
 
   useEffect(() => {
     async function loadStats() {
@@ -101,7 +131,10 @@ export default function AdminDashboard() {
       const quarters = await quartersRes.json();
       const shiftTypes = await shiftTypesRes.json();
 
-      const currentQuarter = quarters[0]?.quarter_id || null;
+      const currentQuarter =
+        quarters.find((q: { quarter_id: string }) => q.quarter_id === quarterId)?.quarter_id ??
+        quarters[0]?.quarter_id ??
+        null;
       const exemptWorkers = workers.filter((w) => w.is_exempt).length;
       
       // WhatsApp stats
@@ -112,6 +145,7 @@ export default function AdminDashboard() {
       let shiftDatesCount = 0;
       let assignedShifts = 0;
       let progressByType: ShiftTypeProgress[] = [];
+      let nextOpen: NextOpen[] = [];
 
       if (currentQuarter) {
         const [shiftsRes, assignmentsRes] = await Promise.all([
@@ -119,8 +153,8 @@ export default function AdminDashboard() {
           fetch(`/api/assignments?quarter_id=${currentQuarter}`),
         ]);
 
-        const shifts: { shift_date_id: string; shift_type_id: string }[] = await shiftsRes.json();
-        const assignments: { shift_date_id: string }[] = await assignmentsRes.json();
+        const shifts: { shift_date_id: string; shift_type_id: string; date: string; shift_type_name: string; is_weekend: number }[] = await shiftsRes.json();
+        const assignments: { shift_date_id: string; role: string }[] = await assignmentsRes.json();
 
         shiftDatesCount = shifts.length;
         assignedShifts = assignments.length;
@@ -138,6 +172,18 @@ export default function AdminDashboard() {
           existing.assigned += assignmentsByShift.get(shift.shift_date_id) || 0;
           typeStats.set(shift.shift_type_id, existing);
         }
+
+        const hasShift = new Set(assignments.filter((a) => a.role === "shift").map((a) => a.shift_date_id));
+        nextOpen = shifts
+          .filter((sh) => (assignmentsByShift.get(sh.shift_date_id) || 0) < 2)
+          .slice(0, 3)
+          .map((sh) => ({
+            shift_date_id: sh.shift_date_id,
+            date: sh.date,
+            shift_type_name: sh.shift_type_name,
+            is_weekend: sh.is_weekend,
+            missingShift: !hasShift.has(sh.shift_date_id),
+          }));
 
         progressByType = shiftTypes.map((st: { shift_type_id: string; name: string }) => ({
           shift_type_id: st.shift_type_id,
@@ -163,11 +209,12 @@ export default function AdminDashboard() {
         notInWhatsappGroup,
         workersNotInWhatsapp,
         progressByType,
+        nextOpen,
       });
     }
 
     loadStats();
-  }, []);
+  }, [quarterId]);
 
   const assignedPct = stats.totalShifts > 0 
     ? Math.round((stats.assignedShifts / stats.totalShifts) * 100) 
@@ -180,7 +227,7 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col gap-[18px] max-w-[1180px]">
       {/* Stat cards grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-3">
         <StatCard 
           label="עובדים פעילים" 
           value={stats.totalWorkers}
@@ -308,6 +355,24 @@ export default function AdminDashboard() {
         </section>
       </div>
 
+      {stats.nextOpen.length > 0 && (
+        <section className="md:hidden rounded-[14px] flex flex-col gap-2 py-3.5 px-3.5 bg-[#1f2130]">
+          <h3 className="text-[15px] font-medium m-0">הבאות לשיבוץ</h3>
+          {stats.nextOpen.map((n) => (
+            <Link key={n.shift_date_id} href="/admin/assign" className="min-h-12 flex items-center gap-2.5">
+              <DateChip iso={n.date} weekend={n.is_weekend === 1} />
+              <span className="flex flex-col">
+                <span className="text-sm">{n.shift_type_name}</span>
+                <span className={`text-xs ${n.missingShift ? "nocturne-warning" : "nocturne-text-muted"}`}>
+                  {n.missingShift ? "משמרת ורזרבה פתוחות" : "רזרבה פתוחה"}
+                </span>
+              </span>
+              <span className="mr-auto text-lg text-[#5c6070]">‹</span>
+            </Link>
+          ))}
+        </section>
+      )}
+
       {/* Workers not in WhatsApp */}
       {stats.workersNotInWhatsapp.length > 0 && (
         <section className="rounded-lg flex flex-col gap-3 py-4 px-[18px] nocturne-surface">
@@ -332,10 +397,16 @@ export default function AdminDashboard() {
                   <span className="text-[11px] nocturne-text-muted">{worker.rank_name}</span>
                 </div>
                 {worker.phone && (
-                  <span className="text-[11px] mr-auto nocturne-text-tertiary ltr" dir="ltr">
+                  <span className="hidden md:inline text-[11px] mr-auto nocturne-text-tertiary ltr" dir="ltr">
                     {worker.phone}
                   </span>
                 )}
+                <button
+                  onClick={() => markJoined(worker.worker_id)}
+                  className="mr-auto md:mr-0 flex-none min-h-9 px-3 text-xs rounded-lg border nocturne-border"
+                >
+                  צורף
+                </button>
               </div>
             ))}
           </div>

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PotentialExport } from "@/components/potential-export";
 import { WorkerImport } from "@/components/worker-import";
+import { useIsMobile } from "@/lib/use-media";
+import { MobileWorkersList } from "@/components/mobile/workers-list";
 import { InspectorPanel, InspectorWorkerData } from "@/components/inspector-panel";
 import {
   DropdownMenu,
@@ -36,6 +38,7 @@ export default function WorkersPage() {
 }
 
 function WorkersPageContent() {
+  const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const initialFilter = searchParams.get("filter");
   const initialSearch = searchParams.get("search") ?? "";
@@ -162,12 +165,16 @@ function WorkersPageContent() {
     }
   }
 
-  if (loading) {
+  if (loading || isMobile === null) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-[13px] nocturne-text-muted">טוען...</div>
       </div>
     );
+  }
+
+  if (isMobile) {
+    return <MobileWorkersList workers={workers} ranks={ranks} />;
   }
 
   return (

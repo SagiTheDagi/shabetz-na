@@ -20,6 +20,12 @@ const assistant = Assistant({
 export const metadata: Metadata = {
   title: "שב\"צ-נא",
   description: "מערכת ניהול משמרות רבעוניות",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

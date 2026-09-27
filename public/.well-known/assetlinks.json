@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.twa.shabetzna",
+      "sha256_cert_fingerprints": [
+        "99:B8:60:0F:03:82:44:3C:F7:21:06:09:43:CF:04:94:F1:1F:23:6A:6C:89:0D:DA:A1:E8:C6:C8:5A:EF:96:EA"
+      ]
+    }
+  }
+]

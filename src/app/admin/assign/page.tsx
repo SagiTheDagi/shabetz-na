@@ -1123,6 +1123,12 @@ export default function AssignPage() {
     const res = await fetch(
       `/api/assignments/warnings?shift_date_id=${selectedShiftId}&role=${selectedRole}`
     );
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      toast.error(data?.error ?? "שגיאה בטעינת מועמדים למשמרת");
+      setWorkers([]);
+      return;
+    }
     setWorkers(await res.json());
   }, [selectedShiftId, selectedRole]);
 
@@ -1304,6 +1310,7 @@ export default function AssignPage() {
             if (selectedShiftId) handleAssign(selectedShiftId, workerId, selectedRole);
           }}
           onUnassign={handleUnassign}
+          justiceMap={justiceMap}
         />
         {forceModalEl}
       </>

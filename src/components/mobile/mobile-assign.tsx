@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { BottomSheet } from "@/components/mobile/bottom-sheet";
-import { DateChip } from "@/components/mobile/date-chip";
+import { DateChip, monthLabel } from "@/components/mobile/date-chip";
 import { Avatar } from "@/components/mobile/avatar";
 import { ToggleRow } from "@/components/mobile/toggle-row";
 import type { AssignmentWarning } from "@/lib/types";
@@ -44,6 +44,7 @@ interface Props {
   onSelectSlot: (shiftId: string, role: "shift" | "reserve") => void;
   onAssign: (workerId: string) => void;
   onUnassign: (assignmentId: string) => void;
+  justiceMap?: Map<string, number>;
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -109,6 +110,16 @@ function Chips({
 
 const sevRank: Record<string, number> = { green: 0, orange: 1, amber: 2, red: 3 };
 
+type SortKey = "default" | "name" | "days" | "priority" | "count";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "default", label: "אוטומטי" },
+  { value: "name", label: "שם" },
+  { value: "days", label: "ימים מאז" },
+  { value: "priority", label: "עדיפות" },
+  { value: "count", label: "מספר משמרות" },
+];
+
 export function MobileAssign({
   shifts,
   assignments,
@@ -118,6 +129,7 @@ export function MobileAssign({
   onSelectSlot,
   onAssign,
   onUnassign,
+  justiceMap,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -134,7 +146,7 @@ export function MobileAssign({
   const [branchF, setBranchF] = useState<string[]>([]);
   const [teamF, setTeamF] = useState<string[]>([]);
   const [showExempt, setShowExempt] = useState(true);
-  const [sortKey, setSortKey] = useState<"default" | "name">("default");
+  const [sortKey, setSortKey] = useState<SortKey>("default");
 
   const byShift = useMemo(() => {
     const m = new Map<string, { shift?: MAssignment; reserve?: MAssignment }>();
@@ -202,13 +214,16 @@ export function MobileAssign({
       const pa = a.eligibility_priority ?? 999;
       const pb = b.eligibility_priority ?? 999;
       if (pa !== pb) return pa - pb;
-      if (sortKey === "name") {
-        const n = a.name.localeCompare(b.name, "he");
-        if (n) return n;
-      }
+      let userSort = 0;
+      if (sortKey === "name") userSort = a.name.localeCompare(b.name, "he");
+      else if (sortKey === "days") userSort = days(b) - days(a);
+      else if (sortKey === "priority") userSort = pa - pb;
+      else if (sortKey === "count")
+        userSort = (justiceMap?.get(a.worker_id) ?? 0) - (justiceMap?.get(b.worker_id) ?? 0);
+      if (userSort) return userSort;
       return days(b) - days(a);
     });
-  }, [candidates, q, showExempt, rankF, branchF, teamF, sortKey]);
+  }, [candidates, q, showExempt, rankF, branchF, teamF, sortKey, justiceMap]);
 
   function pick(id: string, role: "shift" | "reserve") {
     onSelectSlot(id, role);
@@ -228,11 +243,12 @@ export function MobileAssign({
         </button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto px-4 pb-4 flex flex-col gap-2">
-        {shownShifts.map((s) => {
+        {shownShifts.map((s, i) => {
           const e = byShift.get(s.shift_date_id) ?? {};
           const n = (e.shift ? 1 : 0) + (e.reserve ? 1 : 0);
           const status = n === 2 ? ["מלא", "#86c9a4"] : n === 0 ? ["ריק", "#5c6070"] : ["חלקי", "#dcb182"];
           const sel = open && selectedShiftId === s.shift_date_id;
+          const newMonth = i === 0 || shownShifts[i - 1].date.slice(0, 7) !== s.date.slice(0, 7);
           const slot = (role: "shift" | "reserve", a?: MAssignment) => (
             <button
               onClick={() => pick(s.shift_date_id, role)}
@@ -254,8 +270,13 @@ export function MobileAssign({
             </button>
           );
           return (
+            <Fragment key={s.shift_date_id}>
+              {newMonth && (
+                <div className="sticky -top-px z-10 -mx-4 px-4 py-1.5 text-xs font-medium nocturne-bg nocturne-text-muted">
+                  {monthLabel(s.date)}
+                </div>
+              )}
             <div
-              key={s.shift_date_id}
               className={`p-3 rounded-[14px] bg-[#1f2130] flex flex-col gap-2.5 ${
                 sel ? "shadow-[inset_0_0_0_1px_#9184d9]" : ""
               }`}
@@ -272,6 +293,7 @@ export function MobileAssign({
                 {slot("reserve", e.reserve)}
               </div>
             </div>
+            </Fragment>
           );
         })}
         {shifts.length === 0 && <div className="py-16 text-center text-sm nocturne-text-muted">אין משמרות ברבעון</div>}
@@ -365,12 +387,9 @@ export function MobileAssign({
             <Chips label="צוות" options={teamOptions.map((t) => ({ value: t, label: t }))} selected={teamF} onToggle={(v) => setTeamF((p) => toggleIn(p, v))} />
             <Chips
               label="מיון"
-              options={[
-                { value: "default", label: "ברירת מחדל" },
-                { value: "name", label: "שם" },
-              ]}
+              options={SORT_OPTIONS}
               selected={[sortKey]}
-              onToggle={(v) => setSortKey(v as "default" | "name")}
+              onToggle={(v) => setSortKey(v as SortKey)}
             />
             <div className="rounded-lg bg-[#1c1e2c]">
               <ToggleRow label="הצג פטורים" checked={showExempt} onChange={setShowExempt} />
@@ -379,6 +398,7 @@ export function MobileAssign({
               <button
                 className="min-h-10 rounded-[10px] border nocturne-border text-sm"
                 onClick={() => {
+                  setQ("");
                   setRankF([]);
                   setBranchF([]);
                   setTeamF([]);
@@ -394,6 +414,11 @@ export function MobileAssign({
         <div className="flex-1 min-h-0 overflow-auto px-3 flex flex-col gap-1.5">
           {list.map((c) => {
             const n = note(c);
+            const shiftCount = justiceMap?.get(c.worker_id);
+            const meta = [
+              c.days_since_last_shift !== null ? `${c.days_since_last_shift} ימים` : null,
+              shiftCount !== undefined ? `${shiftCount} מש׳` : null,
+            ].filter(Boolean).join(" · ");
             return (
               <div
                 key={c.worker_id}
@@ -417,8 +442,8 @@ export function MobileAssign({
                   >
                     שבץ
                   </button>
-                  {c.days_since_last_shift !== null && (
-                    <span className="text-[11px] nocturne-text-muted font-sans">{c.days_since_last_shift} ימים</span>
+                  {meta && (
+                    <span className="text-[11px] nocturne-text-muted font-sans whitespace-nowrap">{meta}</span>
                   )}
                 </span>
               </div>

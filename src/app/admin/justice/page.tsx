@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Search, ChevronDown, RefreshCw } from "lucide-react";
 import type { JusticeChartData } from "@/lib/types";
+import { filterJusticeEntries } from "@/lib/justice-chart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,15 +66,10 @@ export default function JusticePage() {
 
   const maxPossibleTotal = useMemo(() => (entries.length > 0 ? Math.max(...entries.map((e) => e.total_shifts)) : 0), [entries]);
 
-  const filteredEntries = useMemo(() => {
-    const nameLower = filterName.trim().toLowerCase();
-    return entries.filter((e) => {
-      if (nameLower && !e.name.toLowerCase().includes(nameLower)) return false;
-      if (selectedRanks.length > 0 && !selectedRanks.includes(e.rank_name)) return false;
-      if (e.total_shifts < minTotal) return false;
-      return true;
-    });
-  }, [entries, filterName, selectedRanks, minTotal]);
+  const filteredEntries = useMemo(
+    () => filterJusticeEntries(entries, { name: filterName, ranks: selectedRanks, minTotal }),
+    [entries, filterName, selectedRanks, minTotal]
+  );
 
   const maxShifts = filteredEntries.length > 0 ? Math.max(...filteredEntries.map((e) => e.total_shifts)) : 0;
 

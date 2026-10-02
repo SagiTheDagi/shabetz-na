@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingState } from "@/components/loading-state";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -116,7 +117,7 @@ export default function WorkerDetailPage() {
   }, [workerId]);
 
   if (missing) return <div className="py-16 text-center text-sm nocturne-text-muted">עובד לא נמצא</div>;
-  if (!worker || !form) return <div className="py-16 text-center text-sm nocturne-text-muted">טוען...</div>;
+  if (!worker || !form) return <LoadingState />;
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
   const dirty = JSON.stringify(form) !== JSON.stringify(toForm(worker));

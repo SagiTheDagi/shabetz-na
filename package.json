@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test --experimental-test-module-mocks src/lib/*.test.ts",
+    "test:e2e": "node scripts/e2e.mjs",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:backup": "tsx --env-file=.env scripts/backup.ts"
@@ -45,6 +46,7 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"

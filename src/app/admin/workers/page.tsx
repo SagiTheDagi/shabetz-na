@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingState } from "@/components/loading-state";
 import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, MessageCircle, AlertTriangle, Check, X, ChevronDown } from "lucide-react";
@@ -31,7 +32,7 @@ interface Rank {
 
 export default function WorkersPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="text-[13px] nocturne-text-muted">טוען...</div></div>}>
+    <Suspense fallback={<LoadingState />}>
       <WorkersPageContent />
     </Suspense>
   );
@@ -166,11 +167,7 @@ function WorkersPageContent() {
   }
 
   if (loading || isMobile === null) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[13px] nocturne-text-muted">טוען...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (isMobile) {

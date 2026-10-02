@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { LoadingState } from "@/components/loading-state";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Search, ChevronDown, RefreshCw } from "lucide-react";
 import type { JusticeChartData } from "@/lib/types";
+import { useFetchState } from "@/lib/use-fetch-state";
 import { filterJusticeEntries } from "@/lib/justice-chart";
 import {
   DropdownMenu,
@@ -14,28 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function JusticePage() {
-  const [data, setData] = useState<JusticeChartData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, setData, loading } = useFetchState<JusticeChartData>("/api/justice-chart");
   const [updating, setUpdating] = useState(false);
 
   const [filterName, setFilterName] = useState("");
   const [selectedRanks, setSelectedRanks] = useState<string[]>([]);
   const [minTotal, setMinTotal] = useState(0);
-
-  async function loadChart() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/justice-chart");
-      if (res.ok) setData(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadChart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handleUpdate() {
     setUpdating(true);
@@ -55,7 +41,7 @@ export default function JusticePage() {
     }
   }
 
-  const entries = data?.entries ?? [];
+  const entries = useMemo(() => data?.entries ?? [], [data]);
   const shiftTypes = data?.shift_types ?? [];
   const firstEntry = entries[0];
 
@@ -78,11 +64,7 @@ export default function JusticePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[13px] nocturne-text-muted">טוען...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (

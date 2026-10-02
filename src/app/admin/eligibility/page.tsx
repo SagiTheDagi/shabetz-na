@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingState } from "@/components/loading-state";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import type { Rank, ShiftType, RankShiftEligibility } from "@/lib/types";
@@ -105,11 +106,7 @@ export default function EligibilityPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-[13px] nocturne-text-muted">טוען...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   // Stats

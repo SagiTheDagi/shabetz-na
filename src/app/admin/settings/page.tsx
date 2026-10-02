@@ -4,8 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { RankManager } from "@/components/rank-manager";
-import { ShiftTypeManager } from "@/components/shift-type-manager";
+import { SimpleCrudTable } from "@/components/simple-crud-table";
 import { ShiftDateImport } from "@/components/shift-date-import";
 import { FormResponseImport } from "@/components/form-response-import";
 import { MobileShiftDates } from "@/components/mobile/shift-dates-mobile";
@@ -52,7 +51,16 @@ function SettingsTabs() {
         <TabsContent value="ranks">
           <Card>
             <CardContent className="pt-6">
-              <RankManager />
+              <SimpleCrudTable
+                apiPath="/api/ranks"
+                idField="rank_id"
+                nameColumnLabel="שם דרגה"
+                idPlaceholder="OL5"
+                namePlaceholder="שם הדרגה"
+                addButtonLabel="הוסף דרגה"
+                confirmDelete="למחוק דרגה זו?"
+                messages={{ added: "דרגה נוספה", updated: "דרגה עודכנה", deleted: "דרגה נמחקה" }}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -60,7 +68,17 @@ function SettingsTabs() {
         <TabsContent value="shift-types">
           <Card>
             <CardContent className="pt-6">
-              <ShiftTypeManager />
+              <SimpleCrudTable
+                apiPath="/api/shift-types"
+                idField="shift_type_id"
+                nameColumnLabel="שם סוג משמרת"
+                idPlaceholder="PATROL"
+                idInputClassName="w-32"
+                namePlaceholder="שם סוג המשמרת"
+                addButtonLabel="הוסף סוג"
+                confirmDelete="למחוק סוג משמרת זה?"
+                messages={{ added: "סוג משמרת נוסף", updated: "סוג משמרת עודכן", deleted: "סוג משמרת נמחק" }}
+              />
             </CardContent>
           </Card>
         </TabsContent>

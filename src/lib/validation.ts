@@ -26,7 +26,7 @@ export function validateInteger(
   value: unknown,
   fieldName: string
 ): number {
-  const num = typeof value === "string" ? parseInt(value, 10) : value;
+  const num = typeof value === "string" && /^\s*-?\d+\s*$/.test(value) ? parseInt(value, 10) : value;
   if (typeof num !== "number" || isNaN(num) || !Number.isInteger(num)) {
     throw new ValidationError(`${fieldName} חייב להיות מספר שלם`);
   }

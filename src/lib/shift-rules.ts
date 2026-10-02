@@ -109,7 +109,18 @@ export function getWorkerWarnings(
       )
       .get(workerId, `${year}-%`) as { count: number };
 
-    if (weekendCount.count > 0) {
+    // Assignments not yet in ShiftHistory (current, unpublished work) count too.
+    const pendingWeekend = db
+      .prepare(
+        `SELECT COUNT(*) as count FROM ShiftAssignment sa
+         JOIN ShiftDate sd ON sd.shift_date_id = sa.shift_date_id
+         WHERE sa.worker_id = ? AND sa.role = 'shift' AND sd.is_weekend = 1
+         AND sd.shift_type_id != 'GUARD' AND sd.date LIKE ?
+         AND sd.shift_date_id != ?`
+      )
+      .get(workerId, `${year}-%`, shiftDateId) as { count: number };
+
+    if (weekendCount.count + pendingWeekend.count > 0) {
       warnings.push({
         type: "weekend_limit",
         severity: "red",
@@ -122,11 +133,19 @@ export function getWorkerWarnings(
   const otherRole = role === "shift" ? "reserve" : "shift";
   const otherWorker = db
     .prepare(
-      `SELECT w.branch FROM ShiftAssignment sa
+      `SELECT w.worker_id, w.branch FROM ShiftAssignment sa
        JOIN Worker w ON w.worker_id = sa.worker_id
        WHERE sa.shift_date_id = ? AND sa.role = ?`
     )
-    .get(shiftDateId, otherRole) as { branch: string | null } | undefined;
+    .get(shiftDateId, otherRole) as { worker_id: string; branch: string | null } | undefined;
+
+  if (otherWorker?.worker_id === workerId) {
+    warnings.push({
+      type: "same_worker_both_roles",
+      severity: "red",
+      message: `העובד כבר משובץ כ${role === "reserve" ? "משמרת" : "רזרבה"} באותה משמרת`,
+    });
+  }
 
   if (
     otherWorker &&

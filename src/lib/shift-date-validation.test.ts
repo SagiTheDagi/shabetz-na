@@ -23,3 +23,12 @@ test("weekend is Thu-Sat", () => {
   assert.equal(isWeekendDate("2026-07-09"), true); // Thu
   assert.equal(isWeekendDate("2026-07-12"), false); // Sun
 });
+
+test("calendar-impossible dates are invalid (no Date rollover)", () => {
+  const range = { start_date: "2026-01-01", end_date: "2026-12-31" };
+  for (const d of ["2026-02-30", "2026-04-31", "2026-02-29", "2026-13-01", "2026-00-10"]) {
+    assert.equal(validateShiftDate({ date: d, shift_type_id: "G" }, range, []), "invalid_date", d);
+  }
+  const leap = { start_date: "2028-01-01", end_date: "2028-12-31" };
+  assert.equal(validateShiftDate({ date: "2028-02-29", shift_type_id: "G" }, leap, []), null);
+});

@@ -57,6 +57,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Everything below is an API route (or unknown path): login is always required.
+  if (pathname.startsWith("/api") && !session) {
+    return NextResponse.json({ error: "נדרשת התחברות" }, { status: 401 });
+  }
+
+  // Workers need to read quarters to pick one on their availability page.
+  if (pathname.startsWith("/api/quarters") && req.method === "GET") {
+    return NextResponse.next();
+  }
+
   // Admin-only API routes
   const adminApiPrefixes = [
     "/api/workers",
@@ -71,22 +81,11 @@ export async function middleware(req: NextRequest) {
 
   for (const prefix of adminApiPrefixes) {
     if (pathname.startsWith(prefix)) {
-      if (!session || !session.is_admin) {
+      if (!session!.is_admin) {
         return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
       }
       return NextResponse.next();
     }
-  }
-
-  // Availability API — worker must be logged in
-  if (pathname.startsWith("/api/availability")) {
-    if (!session) {
-      return NextResponse.json(
-        { error: "נדרשת התחברות" },
-        { status: 401 }
-      );
-    }
-    return NextResponse.next();
   }
 
   return NextResponse.next();

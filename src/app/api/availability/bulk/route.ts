@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
+import { withApiErrors } from "@/lib/api-helpers";
 import {
   replaceAvailability,
   validateEntries,
@@ -24,14 +25,8 @@ interface BulkWorker {
  * -worker endpoint: re-running an import refreshes only previously imported
  * rows and leaves the worker's own submissions untouched.
  */
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "נדרשת התחברות" }, { status: 401 });
-  }
-  if (!session.is_admin) {
-    return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-  }
+export const POST = withApiErrors(async (req: Request) => {
+  await requireAdmin();
 
   const body = await req.json();
   const { quarter_id, workers } = body as {
@@ -95,4 +90,4 @@ export async function POST(req: Request) {
     entries: written,
     source,
   });
-}
+});

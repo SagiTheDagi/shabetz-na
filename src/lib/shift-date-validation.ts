@@ -16,15 +16,20 @@ export function isWeekendDate(iso: string): boolean {
   return day === 4 || day === 5 || day === 6;
 }
 
+/** YYYY-MM-DD that exists on the calendar (rejects 2026-02-30, which Date silently rolls over). */
+function isRealIsoDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const d = new Date(iso + "T12:00:00Z");
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+}
+
 export function validateShiftDate(
   draft: ShiftDateDraft,
   quarter: { start_date: string; end_date: string },
   siblings: ShiftDateSibling[],
   editingId?: string | null
 ): ShiftDateIssue {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || isNaN(new Date(draft.date + "T12:00:00").getTime())) {
-    return "invalid_date";
-  }
+  if (!isRealIsoDate(draft.date)) return "invalid_date";
   if (draft.date < quarter.start_date || draft.date > quarter.end_date) return "out_of_range";
   if (
     siblings.some(

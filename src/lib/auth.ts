@@ -57,6 +57,28 @@ export async function getSession(): Promise<SessionPayload | null> {
   return verifySession(token);
 }
 
+export class AuthError extends Error {
+  constructor(
+    message: string,
+    public status: 401 | 403
+  ) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+export async function requireSession(): Promise<SessionPayload> {
+  const session = await getSession();
+  if (!session) throw new AuthError("נדרשת התחברות", 401);
+  return session;
+}
+
+export async function requireAdmin(): Promise<SessionPayload> {
+  const session = await requireSession();
+  if (!session.is_admin) throw new AuthError("אין הרשאה", 403);
+  return session;
+}
+
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {

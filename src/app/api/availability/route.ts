@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
+import { withApiErrors } from "@/lib/api-helpers";
 import {
   readAvailability,
   replaceAvailability,
@@ -9,11 +10,8 @@ import {
 } from "@/lib/availability-repo";
 import { AVAILABILITY_SOURCES, type AvailabilitySource } from "@/lib/types";
 
-export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "נדרשת התחברות" }, { status: 401 });
-  }
+export const GET = withApiErrors(async (req: NextRequest) => {
+  const session = await requireSession();
 
   const quarterId = req.nextUrl.searchParams.get("quarter_id");
   const allWorkers = req.nextUrl.searchParams.get("all") === "true";
@@ -52,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   query += " ORDER BY date";
   return NextResponse.json(db.prepare(query).all(...params));
-}
+});
 
 /**
  * Replaces a worker's availability for one quarter.
@@ -65,11 +63,8 @@ export async function GET(req: NextRequest) {
  * A non-admin may only write their own rows, always as source `worker`.
  * An admin may target another worker via `worker_id` and choose the source.
  */
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "נדרשת התחברות" }, { status: 401 });
-  }
+export const POST = withApiErrors(async (req: Request) => {
+  const session = await requireSession();
 
   const body = await req.json();
   const { quarter_id, entries } = body as {
@@ -123,4 +118,4 @@ export async function POST(req: Request) {
   })();
 
   return NextResponse.json(readAvailability(db, workerId, quarter_id));
-}
+});

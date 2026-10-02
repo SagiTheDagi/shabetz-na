@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
+import { withApiErrors } from "@/lib/api-helpers";
 import { getWorkerWarnings } from "@/lib/shift-rules";
 import { v4 as uuid } from "uuid";
 
@@ -29,11 +30,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(assignments);
 }
 
-export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session || !session.is_admin) {
-    return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-  }
+export const POST = withApiErrors(async (req: Request) => {
+  const session = await requireAdmin();
 
   const body = await req.json();
   const { shift_date_id, worker_id, is_forced, force_reason, role = "shift" } = body as {
@@ -117,7 +115,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ assignment_id: assignmentId, warnings });
-}
+});
 
 export async function DELETE(req: NextRequest) {
   const assignmentId = req.nextUrl.searchParams.get("assignment_id");

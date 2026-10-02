@@ -39,10 +39,14 @@ const SCHEMA = `
   CREATE TABLE ShiftHistory (history_id TEXT PRIMARY KEY, worker_id TEXT NOT NULL REFERENCES Worker(worker_id) ON DELETE CASCADE,
     quarter_id TEXT NOT NULL, shift_date_id TEXT NOT NULL REFERENCES ShiftDate(shift_date_id) ON DELETE CASCADE,
     was_weekend INTEGER NOT NULL DEFAULT 0);
+  CREATE TABLE JusticeChart (worker_id TEXT NOT NULL, shift_type_id TEXT NOT NULL,
+    total_shifts INTEGER NOT NULL DEFAULT 0, weekend_shifts INTEGER NOT NULL DEFAULT 0,
+    period_start TEXT NOT NULL, period_end TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (worker_id, shift_type_id));
 `;
 
 const TABLES = [
-  "ShiftHistory", "ShiftAssignment", "WorkerAvailability", "ShiftDate", "Quarter",
+  "JusticeChart",   "ShiftHistory", "ShiftAssignment", "WorkerAvailability", "ShiftDate", "Quarter",
   "Worker", "RankShiftEligibility", "ShiftType", "Rank",
 ];
 

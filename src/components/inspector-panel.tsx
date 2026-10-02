@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Phone, AlertTriangle, MessageCircle, Users, Clock, FileText, Save, Archive, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { HEBREW_DAYS } from "@/lib/date-utils";
 
 export interface InspectorWorkerData {
   worker_id: string;
@@ -57,8 +58,7 @@ interface InspectorPanelProps {
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
-  const days = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-  return `יום ${days[d.getDay()]}, ${d.toLocaleDateString("he-IL")}`;
+  return `יום ${HEBREW_DAYS[d.getDay()]}, ${d.toLocaleDateString("he-IL")}`;
 }
 
 function ToggleButton({ 

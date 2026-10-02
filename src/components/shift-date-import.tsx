@@ -11,8 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import type { Quarter, ShiftType } from "@/lib/types";
 import type { ParsedShiftDate } from "@/lib/file-parser";
-
-const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+import { HEBREW_DAYS, isWeekend, toIsoDate, toDisplayDate } from "@/lib/date-utils";
 
 function serialToDate(serial: number): Date {
   const info = XLSX.SSF.parse_date_code(serial);
@@ -53,18 +52,14 @@ function parseCsvDate(s: string): Date | null {
   return null;
 }
 
-function dateToIso(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function makeParsedDate(date: Date, shiftTypeId: string): ParsedShiftDate {
-  const day = date.getDay();
+  const isoDate = toIsoDate(date);
   return {
-    date: dateToIso(date),
+    date: isoDate,
     shift_type_id: shiftTypeId,
-    is_weekend: day === 4 || day === 5 || day === 6,
-    display_date: `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
-    day_name: HEBREW_DAYS[day],
+    is_weekend: isWeekend(date),
+    display_date: toDisplayDate(isoDate),
+    day_name: HEBREW_DAYS[date.getDay()],
   };
 }
 
@@ -95,8 +90,7 @@ function parseSheetDates(rows: unknown[][]): RawDate[] {
     }
 
     if (!date || isNaN(date.getTime())) continue;
-    const day = date.getDay();
-    result.push({ date, isWeekend: day === 4 || day === 5 || day === 6 });
+    result.push({ date, isWeekend: isWeekend(date) });
   }
 
   return result;

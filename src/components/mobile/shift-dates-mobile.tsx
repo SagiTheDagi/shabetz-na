@@ -10,6 +10,7 @@ import {
   validateShiftDate,
 } from "@/lib/shift-date-validation";
 import { useSelectedQuarter } from "@/lib/selected-quarter";
+import { hebrewDayName } from "@/lib/date-utils";
 import type { Quarter, ShiftType } from "@/lib/types";
 
 interface Row {
@@ -22,8 +23,6 @@ interface Row {
 interface Assignment {
   shift_date_id: string;
 }
-
-const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 interface Draft {
   id: string | null;
@@ -137,7 +136,6 @@ export function MobileShiftDates() {
       <div className="flex flex-col gap-2">
         {rows.map((r) => {
           const n = staffed[r.shift_date_id] ?? 0;
-          const wd = new Date(r.date + "T12:00:00").getDay();
           return (
             <button
               key={r.shift_date_id}
@@ -148,7 +146,7 @@ export function MobileShiftDates() {
               <span className="flex flex-col gap-0.5">
                 <span className="text-sm">{r.shift_type_name}</span>
                 <span className="text-xs nocturne-text-muted">
-                  יום {DAYS[wd]}
+                  יום {hebrewDayName(r.date)}
                   {r.is_weekend === 1 ? " · סופ״ש" : ""}
                 </span>
               </span>

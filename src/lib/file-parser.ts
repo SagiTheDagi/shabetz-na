@@ -1,17 +1,11 @@
+import { HEBREW_DAYS, fromIsoDate, isWeekend, toIsoDate, toDisplayDate } from "./date-utils";
+
 export interface ParsedShiftDate {
   date: string; // ISO format YYYY-MM-DD
   shift_type_id: string;
   is_weekend: boolean;
   display_date: string; // DD/MM/YYYY
   day_name: string;
-}
-
-const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
-function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  // Thursday (4), Friday (5), Saturday (6)
-  return day === 4 || day === 5 || day === 6;
 }
 
 function parseDateString(raw: string): Date | null {
@@ -31,7 +25,7 @@ function parseDateString(raw: string): Date | null {
   // Try YYYY-MM-DD
   const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) {
-    const d = new Date(trimmed);
+    const d = fromIsoDate(trimmed);
     if (!isNaN(d.getTime())) return d;
   }
 
@@ -63,15 +57,14 @@ export function parseShiftFile(
       continue;
     }
 
-    const isoDate = parsed.toISOString().split("T")[0];
-    const day = parsed.getDay();
+    const isoDate = toIsoDate(parsed);
 
     dates.push({
       date: isoDate,
       shift_type_id: shiftTypeId,
       is_weekend: isWeekend(parsed),
-      display_date: `${parsed.getDate().toString().padStart(2, "0")}/${(parsed.getMonth() + 1).toString().padStart(2, "0")}/${parsed.getFullYear()}`,
-      day_name: HEBREW_DAYS[day],
+      display_date: toDisplayDate(isoDate),
+      day_name: HEBREW_DAYS[parsed.getDay()],
     });
   }
 

@@ -32,6 +32,7 @@ import type { Quarter, AssignmentWarning } from "@/lib/types";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getStoredQuarter, setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
+import { HEBREW_DAYS, HEBREW_MONTHS, toShortDate, hebrewDayName, toIsoDate } from "@/lib/date-utils";
 import { useIsMobile } from "@/lib/use-media";
 import { MobileAssign } from "@/components/mobile/mobile-assign";
 
@@ -83,21 +84,6 @@ interface WorkerSuggestion {
 }
 
 // ---- Helpers ----
-
-const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-const HEBREW_MONTHS = [
-  "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
-  "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
-];
-
-function formatDate(iso: string) {
-  const d = new Date(iso + "T00:00:00");
-  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
-}
-
-function getDayName(iso: string) {
-  return HEBREW_DAYS[new Date(iso + "T00:00:00").getDay()];
-}
 
 function getSeverityBorderClass(warnings: AssignmentWarning[]) {
   const order: Record<string, number> = { red: 3, amber: 2, orange: 1, green: 0 };
@@ -451,7 +437,7 @@ function DroppableShiftCard({
       {/* Header row */}
       <div className="flex items-center gap-2 flex-wrap mb-2">
         <span className="font-medium text-[13px]">
-          {formatDate(shift.date)} {getDayName(shift.date)}
+          {toShortDate(shift.date)} {hebrewDayName(shift.date)}
         </span>
         <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 nocturne-text-muted">{shift.shift_type_name}</span>
         {shift.is_weekend === 1 && shift.shift_type_id !== "GUARD" && (
@@ -880,7 +866,7 @@ function CalendarView({
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   function toDateStr(day: number) {
-    return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return toIsoDate(new Date(year, month, day));
   }
 
   function prevMonth() {
@@ -1394,7 +1380,7 @@ export default function AssignPage() {
           <div className="shrink-0 text-sm text-muted-foreground">
             משמרת נבחרת:{" "}
             <span className="font-medium text-foreground">
-              {formatDate(selectedShift.date)} {getDayName(selectedShift.date)} — {selectedShift.shift_type_name}
+              {toShortDate(selectedShift.date)} {hebrewDayName(selectedShift.date)} — {selectedShift.shift_type_name}
             </span>
             <span className="ms-2 text-xs font-medium text-primary">
               ({selectedRole === "shift" ? "משמרת" : "רזרבה"})

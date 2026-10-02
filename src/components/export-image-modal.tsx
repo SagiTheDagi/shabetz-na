@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { hebrewDayName, toDisplayDate } from "@/lib/date-utils";
 import type React from "react";
 
 export interface ExportRow {
@@ -26,19 +27,6 @@ interface ExportImageModalProps {
   onClose: () => void;
   rows: ExportRow[];
   quarterId: string;
-}
-
-const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-
-function getDayName(iso: string) {
-  return HEBREW_DAYS[new Date(iso + "T00:00:00").getDay()];
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso + "T00:00:00");
-  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 const thStyle: React.CSSProperties = {
@@ -152,8 +140,8 @@ export function ExportImageModal({
 
                   return (
                     <tr key={i} style={{ backgroundColor: bgColor }}>
-                      <td style={tdStyle}>{formatDate(row.date)}</td>
-                      <td style={tdStyle}>{getDayName(row.date)}</td>
+                      <td style={tdStyle}>{toDisplayDate(row.date)}</td>
+                      <td style={tdStyle}>{hebrewDayName(row.date)}</td>
                       <td style={tdStyle}>
                         {row.shift_type_name}
                         {row.is_weekend && (

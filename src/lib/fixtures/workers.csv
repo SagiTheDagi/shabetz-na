@@ -1,0 +1,7 @@
+﻿worker_id,name,rank_id,is_exempt,exemption_reason,receives
+# comment
+1001,דני כהן,סמל,0
+1002,רונית לוי,סמל,1,פטור רפואי,0
+1003	יוסי	רב סמל
+1004,,סמל
+1005,אורי,לא-קיים

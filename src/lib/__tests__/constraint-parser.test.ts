@@ -11,8 +11,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseConstraints, computeCoverage, type ParsedConstraints } from "./constraint-parser";
-import { enumerateDates } from "./date-utils";
+import { parseConstraints, computeCoverage, type ParsedConstraints } from "../constraint-parser";
+import { enumerateDates } from "../date-utils";
 
 const Q3: { start_date: string; end_date: string } = {
   start_date: "2026-07-01",

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { parseShiftFile } from "./file-parser";
+import { parseShiftFile } from "../file-parser";
 
 test("DMY and ISO inputs give the same ISO date and display date", () => {
   const { dates, errors } = parseShiftFile("05/01/2026\n2026-01-05", "A");

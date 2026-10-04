@@ -4,7 +4,7 @@ import { SignJWT } from "jose";
 import {
   hashPassword, verifyPassword, createSession, verifySession,
   checkRateLimit, recordFailedLogin, clearLoginAttempts,
-} from "./auth";
+} from "../auth";
 
 describe("passwords", () => {
   it("round-trips and rejects wrong password", async () => {

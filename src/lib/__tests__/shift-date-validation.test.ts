@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isWeekendDate, validateShiftDate } from "./shift-date-validation";
+import { isWeekendDate, validateShiftDate } from "../shift-date-validation";
 
 const q = { start_date: "2026-07-01", end_date: "2026-09-30" };
 const sibs = [{ shift_date_id: "a", date: "2026-07-10", shift_type_id: "t1" }];

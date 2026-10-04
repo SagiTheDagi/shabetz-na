@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { fetchJson } from "./fetch-json";
+import { fetchJson } from "../fetch-json";
 
 const resp = (body: unknown, status = 200) =>
   (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test --experimental-test-module-mocks src/lib/*.test.ts",
+    "test": "tsx --test --experimental-test-module-mocks src/lib/__tests__/*.test.ts",
     "test:e2e": "node scripts/e2e.mjs",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",

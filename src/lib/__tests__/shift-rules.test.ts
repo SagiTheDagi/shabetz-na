@@ -3,7 +3,7 @@ import { resetTestDb } from "./test-db";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import type Database from "better-sqlite3";
-import { getWorkerWarnings, getSortedWorkers } from "./shift-rules";
+import { getWorkerWarnings, getSortedWorkers } from "../shift-rules";
 
 let db: Database.Database;
 let seq = 0;

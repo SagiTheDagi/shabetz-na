@@ -6,10 +6,10 @@ import { resetTestDb } from "./test-db";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import type Database from "better-sqlite3";
-import * as ranks from "../app/api/ranks/route";
-import * as rank from "../app/api/ranks/[rankId]/route";
-import * as types from "../app/api/shift-types/route";
-import * as type from "../app/api/shift-types/[shiftTypeId]/route";
+import * as ranks from "../../app/api/ranks/route";
+import * as rank from "../../app/api/ranks/[rankId]/route";
+import * as types from "../../app/api/shift-types/route";
+import * as type from "../../app/api/shift-types/[shiftTypeId]/route";
 
 let db: Database.Database;
 beforeEach(() => { db = resetTestDb(); });

@@ -8,13 +8,13 @@ import { asUser, asGuest } from "./test-session";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import type Database from "better-sqlite3";
-import * as assignments from "../app/api/assignments/route";
-import * as availability from "../app/api/availability/route";
-import * as bulk from "../app/api/availability/bulk/route";
-import * as justice from "../app/api/justice-chart/route";
-import * as quarters from "../app/api/quarters/route";
-import * as workers from "../app/api/workers/route";
-import * as worker from "../app/api/workers/[workerId]/route";
+import * as assignments from "../../app/api/assignments/route";
+import * as availability from "../../app/api/availability/route";
+import * as bulk from "../../app/api/availability/bulk/route";
+import * as justice from "../../app/api/justice-chart/route";
+import * as quarters from "../../app/api/quarters/route";
+import * as workers from "../../app/api/workers/route";
+import * as worker from "../../app/api/workers/[workerId]/route";
 
 let db: Database.Database;
 beforeEach(() => {

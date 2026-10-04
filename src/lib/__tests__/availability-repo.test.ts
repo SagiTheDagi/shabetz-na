@@ -19,8 +19,8 @@ import {
   replaceAvailability,
   validateEntries,
   type AvailabilityEntry,
-} from "./availability-repo";
-import type { AvailabilitySource, WorkerAvailability } from "./types";
+} from "../availability-repo";
+import type { AvailabilitySource, WorkerAvailability } from "../types";
 
 const QUARTER = "2026-Q3";
 const WORKER = "1001";

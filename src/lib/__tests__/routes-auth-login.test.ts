@@ -3,8 +3,8 @@ import { resetTestDb } from "./test-db";
 import { asGuest, currentToken } from "./test-session";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import * as authRoute from "../app/api/auth/route";
-import { hashPassword, clearLoginAttempts, verifySession } from "./auth";
+import * as authRoute from "../../app/api/auth/route";
+import { hashPassword, clearLoginAttempts, verifySession } from "../auth";
 
 const json = (body: unknown) =>
   new Request("http://x/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

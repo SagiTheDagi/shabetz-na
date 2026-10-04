@@ -5,7 +5,7 @@
  */
 process.env.DATABASE_PATH = ":memory:";
 
-import { getDb } from "./db";
+import { getDb } from "../db";
 
 const SCHEMA = `
   CREATE TABLE Rank (rank_id TEXT PRIMARY KEY, name TEXT NOT NULL, display_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')));

@@ -12,8 +12,8 @@ import {
   filterJusticeEntries,
   getJusticePeriod,
   recomputeJusticeChart,
-} from "./justice-chart";
-import type { JusticeChartEntry } from "./types";
+} from "../justice-chart";
+import type { JusticeChartEntry } from "../types";
 
 // Fixed "today"; window is 2025-06-15 .. 2026-06-15 inclusive.
 const NOW = new Date(2026, 5, 15, 12, 0, 0);

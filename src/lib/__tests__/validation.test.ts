@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   validateString, validateOptionalString, validateInteger, validateBoolean, ValidationError,
-} from "./validation";
+} from "../validation";
 
 describe("validateString", () => {
   it("trims and returns", () => assert.equal(validateString("  שלום ", "שם"), "שלום"));

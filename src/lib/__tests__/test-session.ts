@@ -20,7 +20,7 @@ mock.module("next/headers", {
 } as never);
 
 export async function asUser(worker_id: string, is_admin = false) {
-  const { createSession } = await import("./auth");
+  const { createSession } = await import("../auth");
   token = await createSession({ worker_id, name: `w${worker_id}`, is_admin } as never);
 }
 /** The cookie the handlers last set (login) or cleared (logout). */

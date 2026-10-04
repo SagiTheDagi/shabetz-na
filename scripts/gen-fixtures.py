@@ -1,10 +1,10 @@
-"""Generates mock import files into src/lib/fixtures (run: python3 scripts/gen-fixtures.py)."""
+"""Generates mock import files into src/lib/__tests__/fixtures (run: python3 scripts/gen-fixtures.py)."""
 import datetime as dt
 from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-out = Path(__file__).resolve().parent.parent / "src/lib/fixtures"
+out = Path(__file__).resolve().parent.parent / "src/lib/__tests__/fixtures"
 out.mkdir(parents=True, exist_ok=True)
 F = Font(name="Arial")
 

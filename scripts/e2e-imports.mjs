@@ -3,7 +3,7 @@
 import { chromium } from "playwright";
 import path from "node:path";
 const B = process.env.BASE_URL ?? "http://localhost:3000";
-const FX = path.resolve(import.meta.dirname, "../src/lib/fixtures");
+const FX = path.resolve(import.meta.dirname, "../src/lib/__tests__/fixtures");
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();

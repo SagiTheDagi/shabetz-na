@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { middleware } from "../middleware";
-import { createSession } from "./auth";
+import { middleware } from "../../middleware";
+import { createSession } from "../auth";
 
 const run = async (path: string, who?: "worker" | "admin", method = "GET") => {
   const headers: Record<string, string> = {};

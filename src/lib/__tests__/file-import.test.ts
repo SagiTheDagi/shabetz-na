@@ -2,7 +2,7 @@ import { test, describe, mock } from "node:test";
 import assert from "node:assert/strict";
 
 import { toast } from "sonner";
-import { isExcelFile, readImportFile, handleImportInput } from "./file-import";
+import { isExcelFile, readImportFile, handleImportInput } from "../file-import";
 
 const errors: string[] = [];
 mock.method(toast, "error", (m: string) => { errors.push(m); return "id"; });

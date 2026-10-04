@@ -3,13 +3,13 @@ import { resetTestDb } from "./test-db";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import type Database from "better-sqlite3";
-import * as shifts from "../app/api/shifts/route";
-import * as shift from "../app/api/shifts/[shiftDateId]/route";
-import * as elig from "../app/api/eligibility/route";
-import * as exp from "../app/api/export/route";
-import * as wimport from "../app/api/workers/import/route";
-import * as archive from "../app/api/workers/auto-archive/route";
-import * as potential from "../app/api/workers/potential/route";
+import * as shifts from "../../app/api/shifts/route";
+import * as shift from "../../app/api/shifts/[shiftDateId]/route";
+import * as elig from "../../app/api/eligibility/route";
+import * as exp from "../../app/api/export/route";
+import * as wimport from "../../app/api/workers/import/route";
+import * as archive from "../../app/api/workers/auto-archive/route";
+import * as potential from "../../app/api/workers/potential/route";
 
 let db: Database.Database;
 const json = (body: unknown, method = "POST") =>

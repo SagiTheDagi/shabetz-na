@@ -2,10 +2,10 @@ import { resetTestDb } from "./test-db";
 import { asUser, asGuest } from "./test-session";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { getDb } from "./db";
-import { requireSession, requireAdmin, AuthError } from "./auth";
-import { ValidationError } from "./validation";
-import { withApiErrors, insertOrConflict, updateOrNotFound, deleteOrNotFound } from "./api-helpers";
+import { getDb } from "../db";
+import { requireSession, requireAdmin, AuthError } from "../auth";
+import { ValidationError } from "../validation";
+import { withApiErrors, insertOrConflict, updateOrNotFound, deleteOrNotFound } from "../api-helpers";
 
 beforeEach(() => { resetTestDb(); asGuest(); });
 

@@ -7,7 +7,7 @@ import {
   toDisplayDate,
   toIsoDate,
   toShortDate,
-} from "./date-utils";
+} from "../date-utils";
 
 test("toIsoDate pads month and day", () => {
   assert.equal(toIsoDate(new Date(2026, 0, 5)), "2026-01-05");

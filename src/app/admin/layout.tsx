@@ -40,8 +40,6 @@ const navSections: NavSection[] = [
   {
     title: "הגדרות",
     items: [
-      { href: "/admin/settings?tab=dates", label: "תאריכי משמרות" },
-      { href: "/admin/settings?tab=ranks", label: "דרגות וסוגי משמרות" },
       { href: "/admin/settings", label: "הגדרות כלליות" },
     ],
   },

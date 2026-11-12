@@ -5,9 +5,9 @@ export interface RawWorker {
   worker_id: string;
   name: string;
   file_rank: string;     // rank as it appears in the file
-  is_exempt: number;
+  is_exempt: number | null;          // null = column absent → keep DB value
   exemption_reason: string | null;
-  receives_shift_allocation: number;
+  receives_shift_allocation: number | null; // null = keep DB value
   release_date: string | null;
   notes: string | null;
   branch: string | null;
@@ -40,28 +40,77 @@ export function normalizePhone(raw: unknown): string | null {
   return s;
 }
 
+// Column positions for headerless files (legacy layout)
+const DEFAULT_WORKER_COLUMNS = {
+  worker_id: 0, rank: 1, last_name: 2, first_name: 3,
+  release_date: 5, phone: 9, notes: 10, eligibility: 11,
+};
+type WorkerColumns = typeof DEFAULT_WORKER_COLUMNS;
+
+// Header aliases (normalised: quotes/parens/whitespace stripped)
+const WORKER_HEADER_ALIASES: Record<keyof WorkerColumns, string[]> = {
+  worker_id: ["מספר אישי"],
+  rank: ["דרגה", "דרגה מחושבת"],
+  last_name: ["שם משפחה"],
+  first_name: ["שם פרטי"],
+  release_date: ["תאריך שחרור", "תאריך תום שירות", "תאריך תום שירות תתש"],
+  phone: ["מספר טלפון נייד", "טלפון נייד", "טלפון"],
+  notes: ["הערות"],
+  eligibility: ["כשירות"],
+};
+
+const normHeader = (v: unknown) =>
+  String(v ?? "").replace(/["'״׳()]/g, "").replace(/\s+/g, " ").trim();
+
+function resolveWorkerColumns(header: unknown[]): WorkerColumns {
+  const norm = header.map(normHeader);
+  const out = {} as WorkerColumns;
+  for (const key of Object.keys(WORKER_HEADER_ALIASES) as (keyof WorkerColumns)[]) {
+    const aliases = WORKER_HEADER_ALIASES[key].map(normHeader);
+    out[key] = norm.findIndex((h) => aliases.includes(h));
+  }
+  return out;
+}
+
+// Map file ranks to system rank_ids by rank_id or name, ignoring quotes/spaces
+// (רס"ל → רסל). Unmatched ranks map to "".
+export function autoMapRanks(
+  fileRanks: string[],
+  ranks: { rank_id: string; name?: string | null }[]
+): Record<string, string> {
+  const norm = (s: string) => s.replace(/["'״׳\s]/g, "");
+  const byNorm = new Map<string, string>();
+  for (const r of ranks) {
+    byNorm.set(norm(r.rank_id), r.rank_id);
+    if (r.name) byNorm.set(norm(r.name), r.rank_id);
+  }
+  return Object.fromEntries(fileRanks.map((fr) => [fr, byNorm.get(norm(fr)) ?? ""]));
+}
+
 export function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; errors: string[] } {
   const wb = XLSX.read(buffer, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) return { workers: [], errors: ["לא נמצא גיליון בקובץ"] };
 
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true }) as unknown[][];
-  // Skip header row
-  const dataRows = rows[0]?.[0] === "מספר אישי" ? rows.slice(1) : rows;
+  const hasHeader = String(rows[0]?.[0] ?? "").trim() === "מספר אישי";
+  const cols = hasHeader ? resolveWorkerColumns(rows[0]) : DEFAULT_WORKER_COLUMNS;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
 
   const workers: RawWorker[] = [];
   const errors: string[] = [];
+  const at = (r: unknown[], idx: number) => (idx >= 0 ? r[idx] : undefined);
 
   for (let i = 0; i < dataRows.length; i++) {
     const r = dataRows[i] as unknown[];
-    const worker_id = r[0];
-    const file_rank = r[1];
-    const last_name = r[2];
-    const first_name = r[3];
-    const release_date_raw = r[5];
-    const phone_raw = r[9];   // מספר טלפון נייד
-    const notes = r[10];      // הערות
-    const eligibility = r[11]; // כשירות
+    const worker_id = at(r, cols.worker_id);
+    const file_rank = at(r, cols.rank);
+    const last_name = at(r, cols.last_name);
+    const first_name = at(r, cols.first_name);
+    const release_date_raw = at(r, cols.release_date);
+    const phone_raw = at(r, cols.phone);
+    const notes = at(r, cols.notes);
+    const eligibility = at(r, cols.eligibility);
 
     if (worker_id == null || worker_id === "") continue;
 
@@ -71,7 +120,8 @@ export function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; e
     }
 
     const eligStr = String(eligibility ?? "").trim();
-    const is_exempt = eligStr === "לא כשיר" ? 1 : 0;
+    // No כשירות column → null so the import keeps the existing DB value
+    const is_exempt = cols.eligibility < 0 ? null : eligStr === "לא כשיר" ? 1 : 0;
     const notesStr = notes ? String(notes).trim() : null;
     // For exempt workers הערות explains the exemption; for others it's a general note
     const exemption_reason = is_exempt ? notesStr : null;
@@ -83,7 +133,7 @@ export function parseWorkersXlsx(buffer: ArrayBuffer): { workers: RawWorker[]; e
       file_rank: String(file_rank).trim(),
       is_exempt,
       exemption_reason,
-      receives_shift_allocation: 1,
+      receives_shift_allocation: null, // not in xlsx; keep DB value (new workers default to 1)
       release_date: excelDateToIso(release_date_raw),
       notes: worker_notes,
       branch: null,

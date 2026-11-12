@@ -2,7 +2,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseWorkersXlsx, parseCsvWorkers, excelDateToIso, normalizePhone } from "../worker-file-parser";
+import { parseWorkersXlsx, parseCsvWorkers, excelDateToIso, normalizePhone, autoMapRanks } from "../worker-file-parser";
+import * as XLSX from "xlsx";
 import { parseXlsxSheets, parseCsvFile, parseCsvDate, parseWeekendRange, parseSheetDates } from "../shift-date-file-parser";
 import { parseFormBuffer, autoMatchWorker, type WorkerOption } from "../form-response-parser";
 
@@ -67,6 +68,51 @@ describe("parseWorkersXlsx (mock file)", () => {
   test("empty sheet -> no workers, no crash", () => {
     const r = parseWorkersXlsx(buf("workers-empty.xlsx"));
     assert.deepEqual(r.workers, []);
+  });
+});
+
+describe("parseWorkersXlsx (header-mapped layout)", () => {
+  const aoaBuf = (aoa: unknown[][]): ArrayBuffer => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Sheet1");
+    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    return out;
+  };
+  // Personnel-export layout: different column order, no כשירות/הערות
+  const header = ["מספר אישי", "דרגה מחושבת", "שם משפחה", "פרופיל", "מספר טלפון נייד", 'הת"ש - ימי לינה',
+    "שם פרטי", "סוג שירות", 'תאריך תום שירות (תת"ש )', "מסגרת"];
+  const { workers, errors } = parseWorkersXlsx(aoaBuf([
+    header,
+    [8492731, "סרן", "בן זיקרי", 72, "052-4894403", null, "דביר", "קבע", 46387, "ענף"],
+    [8583762, 'רב"ט', "חנצינסקי", 97, null, 3, "דניאל", "חובה", 46387, "ענף"],
+  ]));
+  test("columns resolved by header name", () => {
+    assert.deepEqual(errors, []);
+    assert.equal(workers[0].name, "דביר בן זיקרי");
+    assert.equal(workers[0].file_rank, "סרן");
+    assert.equal(workers[0].phone, "0524894403");
+    assert.equal(workers[0].release_date, "2026-12-31");
+    assert.equal(workers[1].phone, null);
+  });
+  test("no כשירות column -> is_exempt null; allocation always null (keep DB value)", () => {
+    for (const w of workers) {
+      assert.equal(w.is_exempt, null);
+      assert.equal(w.exemption_reason, null);
+      assert.equal(w.receives_shift_allocation, null);
+    }
+  });
+  test("legacy fixture with כשירות column still yields 0/1", () => {
+    const r = parseWorkersXlsx(buf("workers.xlsx"));
+    assert.deepEqual(r.workers.map((w) => w.is_exempt), [0, 0, 1, 0]);
+  });
+});
+
+describe("autoMapRanks", () => {
+  const ranks = [{ rank_id: "NOL2", name: "רסל" }, { rank_id: "OL3", name: "סרן" }, { rank_id: "AO", name: "קמא" }];
+  test("matches by name ignoring quotes; by rank_id; unmatched -> empty", () => {
+    assert.deepEqual(autoMapRanks(['רס"ל', "סרן", "קמ״א", "OL3", "טוראי"], ranks), {
+      'רס"ל': "NOL2", "סרן": "OL3", "קמ״א": "AO", OL3: "OL3", "טוראי": "",
+    });
   });
 });
 

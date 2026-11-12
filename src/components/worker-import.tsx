@@ -7,15 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { handleImportInput, readImportFile } from "@/lib/file-import";
 import type { Rank } from "@/lib/types";
-import { parseWorkersXlsx, parseCsvWorkers, type RawWorker } from "@/lib/worker-file-parser";
+import { parseWorkersXlsx, parseCsvWorkers, autoMapRanks, type RawWorker } from "@/lib/worker-file-parser";
 
 interface ParsedWorker {
   worker_id: string;
   name: string;
   rank_id: string;       // system rank_id (after mapping)
-  is_exempt: number;
+  is_exempt: number | null;          // null = column absent → keep DB value
   exemption_reason: string | null;
-  receives_shift_allocation: number;
+  receives_shift_allocation: number | null; // null = keep DB value
   release_date: string | null;
   notes: string | null;
   branch: string | null;
@@ -61,12 +61,8 @@ export function WorkerImport() {
 
       // Build unique file ranks
       const fileRanks = [...new Set(result.workers.map((w) => w.file_rank))];
-      // Auto-map if exact match exists in system ranks
-      const rankIdSet = new Set(ranks.map((r) => r.rank_id));
-      const defaultMappings: Record<string, string> = {};
-      for (const fr of fileRanks) {
-        defaultMappings[fr] = rankIdSet.has(fr) ? fr : (ranks[0]?.rank_id ?? "");
-      }
+      // Unmatched ranks stay empty so the admin must pick explicitly
+      const defaultMappings = autoMapRanks(fileRanks, ranks);
 
       setRawWorkers(result.workers);
       setRankMappings(defaultMappings);

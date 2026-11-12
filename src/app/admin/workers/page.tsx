@@ -10,16 +10,15 @@ import { PotentialExport } from "@/components/potential-export";
 import { WorkerImport } from "@/components/worker-import";
 import { useIsMobile } from "@/lib/use-media";
 import {
-  matchesMulti,
-  filterOptions,
   STATUS_OPTIONS,
-  DEFAULT_STATUSES,
   WorkerStatus,
   workerStatus,
-  sameStatuses,
-  parseStatuses,
   nextStatuses,
+  applyFilters,
+  activeFilterCount,
+  toggleValue,
 } from "@/lib/worker-filters";
+import { useWorkerFilters, useFilterOptions } from "@/lib/use-worker-filters";
 import { MobileWorkersList } from "@/components/mobile/workers-list";
 import { InspectorPanel, InspectorWorkerData } from "@/components/inspector-panel";
 import {
@@ -54,47 +53,23 @@ export default function WorkersPage() {
 function WorkersPageContent() {
   const isMobile = useIsMobile();
   const searchParams = useSearchParams();
-  const initialFilter = searchParams.get("filter");
-  const initialSearch = searchParams.get("search") ?? "";
   const initialWorkerId = searchParams.get("worker");
   
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState(initialSearch);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   
-  // Filters
-  const [statuses, setStatusesState] = useState<WorkerStatus[]>(() =>
-    parseStatuses(searchParams.get("status"))
-  );
-  const [whatsappFilter, setWhatsappFilter] = useState<"all" | "in" | "out">(
-    initialFilter === "no-whatsapp" ? "out" : "all"
-  );
-  const [selectedRanks, setSelectedRanks] = useState<string[]>([]);
-  const [selectedBranches, setSelectedBranches] = useState<string[]>(
-    () => [...new Set(searchParams.getAll("branch").filter(Boolean))]
-  );
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  // Filters (URL-synced, shared with mobile)
+  const filterApi = useWorkerFilters();
+  const { filters, update: updateFilters, reset: clearFilters } = filterApi;
 
-  const branchOptions = useMemo(
-    () => filterOptions(workers, (w) => w.branch, "ללא ענף", selectedBranches),
-    [workers, selectedBranches]
-  );
-  const teamOptions = useMemo(
-    () => filterOptions(workers, (w) => w.team, "ללא צוות", selectedTeams),
-    [workers, selectedTeams]
-  );
-
-  function setStatuses(next: WorkerStatus[]) {
-    setStatusesState(next);
-    updateUrlParam("status", sameStatuses(next, DEFAULT_STATUSES) ? null : next.join(","));
-  }
+  const { branchOptions, teamOptions } = useFilterOptions(workers, filters);
 
   function toggleStatus(s: WorkerStatus) {
-    setStatuses(nextStatuses(statuses, s));
+    updateFilters({ statuses: nextStatuses(filters.statuses, s) });
   }
 
   const statusCounts = useMemo(() => {
@@ -103,32 +78,7 @@ function WorkersPageContent() {
     return c;
   }, [workers]);
 
-  function setBranches(next: string[]) {
-    setSelectedBranches(next);
-    // Repeated params (?branch=a&branch=b) so names containing commas round-trip
-    const url = new URL(window.location.href);
-    url.searchParams.delete("branch");
-    for (const b of next) url.searchParams.append("branch", b);
-    window.history.replaceState(null, "", url);
-  }
-
-  const filtersActive =
-    !!search ||
-    !sameStatuses(statuses, DEFAULT_STATUSES) ||
-    whatsappFilter !== "all" ||
-    selectedRanks.length > 0 ||
-    selectedBranches.length > 0 ||
-    selectedTeams.length > 0;
-
-  function clearFilters() {
-    handleSearchChange("");
-    setStatuses(DEFAULT_STATUSES);
-    setWhatsappFilter("all");
-    updateUrlParam("filter", null);
-    setSelectedRanks([]);
-    setBranches([]);
-    setSelectedTeams([]);
-  }
+  const filtersActive = !!filters.search || activeFilterCount(filters) > 0;
 
   async function reloadWorkers() {
     const res = await fetch("/api/workers?include_exempt=true&include_archived=true");
@@ -165,47 +115,12 @@ function WorkersPageContent() {
     window.history.replaceState(null, "", url);
   }
 
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    updateUrlParam("search", value || null);
-  }
-
   function selectWorker(worker: Worker | null) {
     setSelectedWorker(worker);
     updateUrlParam("worker", worker?.worker_id ?? null);
   }
 
-  const filteredWorkers = useMemo(() => {
-    return workers.filter((w) => {
-      // Search filter
-      if (search) {
-        const searchLower = search.toLowerCase();
-        if (
-          !w.name.toLowerCase().includes(searchLower) &&
-          !w.worker_id.toLowerCase().includes(searchLower) &&
-          !(w.phone?.includes(search))
-        ) {
-          return false;
-        }
-      }
-      
-      // Status filter
-      if (!statuses.includes(workerStatus(w))) return false;
-      
-      // WhatsApp filter
-      if (whatsappFilter === "in" && w.in_whatsapp_group !== 1) return false;
-      if (whatsappFilter === "out" && w.in_whatsapp_group === 1) return false;
-      
-      // Rank filter
-      if (selectedRanks.length > 0 && !selectedRanks.includes(w.rank_id)) return false;
-
-      // Branch / team filters
-      if (!matchesMulti(selectedBranches, w.branch)) return false;
-      if (!matchesMulti(selectedTeams, w.team)) return false;
-
-      return true;
-    });
-  }, [workers, search, statuses, whatsappFilter, selectedRanks, selectedBranches, selectedTeams]);
+  const filteredWorkers = useMemo(() => applyFilters(workers, filters), [workers, filters]);
 
   const stats = useMemo(() => {
     const active = workers.filter((w) => w.is_archived !== 1);
@@ -241,7 +156,7 @@ function WorkersPageContent() {
   }
 
   if (isMobile) {
-    return <MobileWorkersList workers={workers} ranks={ranks} />;
+    return <MobileWorkersList workers={workers} ranks={ranks} filterApi={filterApi} />;
   }
 
   return (
@@ -284,8 +199,8 @@ function WorkersPageContent() {
             <input
               type="text"
               placeholder="חיפוש לפי שם, מספר אישי או טלפון..."
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              value={filters.search}
+              onChange={(e) => updateFilters({ search: e.target.value })}
               className="w-full h-9 pr-10 pl-3 rounded-lg text-[13px] nocturne-surface border border-white/5 focus:border-white/10 focus:outline-none"
             />
           </div>
@@ -294,25 +209,25 @@ function WorkersPageContent() {
           <DropdownMenu>
             <DropdownMenuTrigger className={triggerClass}>
               <MessageCircle className="h-4 w-4" />
-              {whatsappFilter === "all" ? "הכל" : whatsappFilter === "in" ? "בקבוצה" : "לא בקבוצה"}
+              {filters.whatsapp === "all" ? "הכל" : filters.whatsapp === "in" ? "בקבוצה" : "לא בקבוצה"}
               <ChevronDown className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuCheckboxItem
-                checked={whatsappFilter === "all"}
-                onCheckedChange={() => setWhatsappFilter("all")}
+                checked={filters.whatsapp === "all"}
+                onCheckedChange={() => updateFilters({ whatsapp: "all" })}
               >
                 הכל
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
-                checked={whatsappFilter === "in"}
-                onCheckedChange={() => setWhatsappFilter("in")}
+                checked={filters.whatsapp === "in"}
+                onCheckedChange={() => updateFilters({ whatsapp: "in" })}
               >
                 בקבוצת וואטסאפ
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
-                checked={whatsappFilter === "out"}
-                onCheckedChange={() => setWhatsappFilter("out")}
+                checked={filters.whatsapp === "out"}
+                onCheckedChange={() => updateFilters({ whatsapp: "out" })}
               >
                 לא בקבוצה
               </DropdownMenuCheckboxItem>
@@ -322,21 +237,17 @@ function WorkersPageContent() {
           {/* Rank filter */}
           <DropdownMenu>
             <DropdownMenuTrigger className={triggerClass}>
-              דרגה {selectedRanks.length > 0 && `(${selectedRanks.length})`}
+              דרגה {filters.ranks.length > 0 && `(${filters.ranks.length})`}
               <ChevronDown className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {ranks.map((rank) => (
                 <DropdownMenuCheckboxItem
                   key={rank.rank_id}
-                  checked={selectedRanks.includes(rank.rank_id)}
-                  onCheckedChange={(checked) => {
-                    setSelectedRanks((prev) =>
-                      checked
-                        ? [...prev, rank.rank_id]
-                        : prev.filter((r) => r !== rank.rank_id)
-                    );
-                  }}
+                  checked={filters.ranks.includes(rank.rank_id)}
+                  onCheckedChange={() =>
+                    updateFilters({ ranks: toggleValue(filters.ranks, rank.rank_id) })
+                  }
                 >
                   {rank.name}
                 </DropdownMenuCheckboxItem>
@@ -348,8 +259,8 @@ function WorkersPageContent() {
           <MultiFilter
             label="ענף"
             options={branchOptions}
-            selected={selectedBranches}
-            onChange={setBranches}
+            selected={filters.branches}
+            onChange={(branches) => updateFilters({ branches })}
           />
 
           {/* Team filter */}
@@ -357,8 +268,8 @@ function WorkersPageContent() {
             <MultiFilter
               label="צוות"
               options={teamOptions}
-              selected={selectedTeams}
-              onChange={setSelectedTeams}
+              selected={filters.teams}
+              onChange={(teams) => updateFilters({ teams })}
             />
           )}
 
@@ -366,9 +277,9 @@ function WorkersPageContent() {
           <div className="flex items-center rounded-lg border border-white/10 overflow-hidden text-[12px]">
             <button
               type="button"
-              onClick={() => setStatuses(STATUS_OPTIONS.map((o) => o.value))}
+              onClick={() => updateFilters({ statuses: STATUS_OPTIONS.map((o) => o.value) })}
               className={`px-3 py-1.5 transition-colors ${
-                statuses.length === STATUS_OPTIONS.length
+                filters.statuses.length === STATUS_OPTIONS.length
                   ? "bg-[#9184d9]/20 nocturne-accent-light"
                   : "nocturne-text-muted hover:bg-white/5"
               }`}
@@ -381,7 +292,7 @@ function WorkersPageContent() {
                 type="button"
                 onClick={() => toggleStatus(o.value)}
                 className={`px-3 py-1.5 border-r border-white/10 transition-colors ${
-                  statuses.includes(o.value)
+                  filters.statuses.includes(o.value)
                     ? "bg-[#9184d9]/20 nocturne-accent-light"
                     : "nocturne-text-muted hover:bg-white/5"
                 }`}

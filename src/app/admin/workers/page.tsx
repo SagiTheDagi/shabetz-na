@@ -2,7 +2,6 @@
 
 import { LoadingState } from "@/components/loading-state";
 import { Suspense, useEffect, useState, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
 import { Search, MessageCircle, AlertTriangle, Check, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,7 +17,8 @@ import {
   activeFilterCount,
   toggleValue,
 } from "@/lib/worker-filters";
-import { useWorkerFilters, useFilterOptions } from "@/lib/use-worker-filters";
+import { useWorkersUrlState, useFilterOptions } from "@/lib/use-workers-url-state";
+import { useRouter } from "next/navigation";
 import { MobileWorkersList } from "@/components/mobile/workers-list";
 import { InspectorPanel, InspectorWorkerData } from "@/components/inspector-panel";
 import {
@@ -52,18 +52,16 @@ export default function WorkersPage() {
 
 function WorkersPageContent() {
   const isMobile = useIsMobile();
-  const searchParams = useSearchParams();
-  const initialWorkerId = searchParams.get("worker");
   
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   
   // Filters (URL-synced, shared with mobile)
-  const filterApi = useWorkerFilters();
+  const filterApi = useWorkersUrlState();
+  const router = useRouter();
   const { filters, update: updateFilters, reset: clearFilters } = filterApi;
 
   const { branchOptions, teamOptions } = useFilterOptions(workers, filters);
@@ -96,29 +94,47 @@ function WorkersPageContent() {
       const ranksData = await ranksRes.json();
       
       setWorkers(workersData);
-      if (initialWorkerId) {
-        const target = workersData.find((w: Worker) => w.worker_id === initialWorkerId);
-        if (target) setSelectedWorker(target);
-      }
       setRanks(ranksData);
       setLoading(false);
     }
     
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function updateUrlParam(key: string, value: string | null) {
-    const url = new URL(window.location.href);
-    if (value) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
-    window.history.replaceState(null, "", url);
-  }
+  // Selected worker: state mirrored to `?worker=` by the hook
+  const { selectedId, setSelectedId } = filterApi;
+  const [deepLinkId, setDeepLinkId] = useState(selectedId);
+  const selectedWorker = useMemo(
+    () => (selectedId ? workers.find((w) => w.worker_id === selectedId) ?? null : null),
+    [workers, selectedId]
+  );
 
   function selectWorker(worker: Worker | null) {
-    setSelectedWorker(worker);
-    updateUrlParam("worker", worker?.worker_id ?? null);
+    setDeepLinkId(null);
+    setSelectedId(worker?.worker_id ?? null);
   }
+
+  // A `worker` id that matches no worker (e.g. deleted) is dropped once workers are loaded.
+  // An empty list is treated as "not really loaded" so a transient bad response keeps the link.
+  const staleSelection = !loading && workers.length > 0 && !!selectedId && !selectedWorker;
+  useEffect(() => {
+    if (staleSelection) setSelectedId(null);
+  }, [staleSelection, setSelectedId]);
+
+  // Mobile has no inspector panel: a `?worker=` deep link (present at mount, not yet replaced by
+  // a click) opens the worker's page instead. A selection made by clicking on desktop is kept
+  // when the window shrinks. The param is dropped from this history entry first so Back
+  // doesn't redirect again.
+  const { clearSelectionNow } = filterApi;
+  const mobileWorkerRedirect =
+    isMobile && deepLinkId && deepLinkId === selectedId && workers.some((w) => w.worker_id === deepLinkId)
+      ? deepLinkId
+      : null;
+  useEffect(() => {
+    if (!mobileWorkerRedirect) return;
+    clearSelectionNow();
+    router.push(`/admin/workers/${encodeURIComponent(mobileWorkerRedirect)}`);
+  }, [mobileWorkerRedirect, clearSelectionNow, router]);
 
   const filteredWorkers = useMemo(() => applyFilters(workers, filters), [workers, filters]);
 
@@ -145,13 +161,9 @@ function WorkersPageContent() {
         w.worker_id === workerId ? { ...w, in_whatsapp_group: newValue } : w
       )
     );
-    
-    if (selectedWorker?.worker_id === workerId) {
-      setSelectedWorker((prev) => prev ? { ...prev, in_whatsapp_group: newValue } : null);
-    }
   }
 
-  if (loading || isMobile === null) {
+  if (loading || isMobile === null || mobileWorkerRedirect) {
     return <LoadingState />;
   }
 
@@ -445,10 +457,6 @@ function WorkersPageContent() {
                     ? { ...w, ...updatedWorker }
                     : w
                 )
-              );
-              // Update the selected worker
-              setSelectedWorker((prev) =>
-                prev ? { ...prev, ...updatedWorker } : null
               );
             }}
           />

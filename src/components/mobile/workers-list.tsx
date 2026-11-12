@@ -13,7 +13,7 @@ import {
   activeFilterCount,
   toggleValue,
 } from "@/lib/worker-filters";
-import { useFilterOptions, type WorkerFiltersApi } from "@/lib/use-worker-filters";
+import { useFilterOptions, type WorkersUrlStateApi } from "@/lib/use-workers-url-state";
 
 export interface MobileWorkerRow {
   worker_id: string;
@@ -35,7 +35,7 @@ export function MobileWorkersList({
 }: {
   workers: MobileWorkerRow[];
   ranks: { rank_id: string; name: string }[];
-  filterApi: WorkerFiltersApi;
+  filterApi: WorkersUrlStateApi;
 }) {
   const { filters, update, reset } = filterApi;
   const [sheet, setSheet] = useState(false);
@@ -89,6 +89,8 @@ export function MobileWorkersList({
             <Link
               key={w.worker_id}
               href={`/admin/workers/${encodeURIComponent(w.worker_id)}`}
+              // A selection kept from desktop would act as a deep link on Back; drop it first
+              onClick={() => filterApi.selectedId && filterApi.clearSelectionNow()}
               className="min-h-[62px] flex items-center gap-3 py-2 px-1 border-b border-white/5"
             >
               <Avatar name={w.name} size={38} />

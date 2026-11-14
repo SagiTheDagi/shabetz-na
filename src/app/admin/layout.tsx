@@ -17,6 +17,9 @@ import { MobileTabBar } from "@/components/mobile/tab-bar";
 import type { SessionPayload, Quarter } from "@/lib/types";
 import { useInsightsEnabled } from "@/components/insights/budget-indicator";
 import { INSIGHTS_NAV_LINKS } from "@/components/insights/nav-links";
+import { AssistantPanel } from "@/components/insights/assistant-panel";
+import { setAssistantOpen, useAssistantOpen } from "@/lib/insights/panel-store";
+import { useIsMobile } from "@/lib/use-media";
 
 interface NavSection {
   title: string;
@@ -43,7 +46,8 @@ const navSections: NavSection[] = [
   },
   {
     title: "ניתוח",
-    items: INSIGHTS_NAV_LINKS,
+    // This sidebar is desktop-only, where the chat is the docked panel (header toggle), not a page.
+    items: INSIGHTS_NAV_LINKS.filter((l) => l.href !== "/admin/insights"),
     requires: "insights",
   },
   {
@@ -76,7 +80,7 @@ function getPageTitle(pathname: string): { title: string; subtitle?: string } {
   if (pathname.startsWith("/admin/eligibility")) return { title: "מטריצת כשירות", subtitle: "הגדרת כשירות לפי דרגה" };
   if (pathname.startsWith("/admin/justice")) return { title: "טבלת צדק", subtitle: "חלוקה הוגנת של משמרות" };
   if (pathname.startsWith("/admin/insights/saved")) return { title: "תצוגות שמורות", subtitle: "תובנות שנשמרו מהעוזר" };
-  if (pathname.startsWith("/admin/insights")) return { title: "עוזר תובנות", subtitle: "שאלות על נתוני השיבוץ" };
+  if (pathname.startsWith("/admin/insights")) return { title: "עוזר AI", subtitle: "שאלות על נתוני השיבוץ" };
   if (pathname.startsWith("/admin/more")) return { title: "עוד" };
   if (pathname.startsWith("/admin/settings")) return { title: "הגדרות", subtitle: "ניהול המערכת" };
   return { title: "ניהול" };
@@ -93,6 +97,8 @@ export default function AdminLayout({
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [currentQuarter, setCurrentQuarter] = useState<string>("");
   const insightsEnabled = useInsightsEnabled(); // the assistant is optional: nav entry only when the server has a key
+  const assistantOpen = useAssistantOpen();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetch("/api/auth")
@@ -231,6 +237,16 @@ export default function AdminLayout({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            {insightsEnabled && (
+              <Button
+                size="sm"
+                aria-expanded={assistantOpen}
+                onClick={() => setAssistantOpen(!assistantOpen)}
+                className={`hidden md:inline-flex text-xs h-8 px-3 border border-primary text-primary ${assistantOpen ? "nocturne-accent-muted" : "bg-transparent"}`}
+              >
+                {assistantOpen ? "סגירת העוזר" : "עוזר AI"}
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 
@@ -247,9 +263,12 @@ export default function AdminLayout({
           </div>
         </header>
 
-        {/* Page content */}
-        <div className="flex-1 min-h-0 overflow-auto p-4 md:p-5 md:px-[22px] pb-6 md:pb-7">
-          {children}
+        {/* Page content, with the assistant panel docked beside it on desktop */}
+        <div className="flex-1 min-h-0 flex">
+          <div className="flex-1 min-w-0 overflow-auto p-4 md:p-5 md:px-[22px] pb-6 md:pb-7">
+            {children}
+          </div>
+          {insightsEnabled && isMobile === false && <AssistantPanel />}
         </div>
         <MobileTabBar />
       </main>

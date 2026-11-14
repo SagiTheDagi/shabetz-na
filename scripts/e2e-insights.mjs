@@ -101,12 +101,14 @@ try {
 
     await page.goto(B + "/admin/insights");
     if (usage.enabled) {
-      await page.getByText("שאל שאלה על נתוני השיבוץ").waitFor({ timeout: 15000 });
+      // Desktop: the route opens the docked panel. Mobile: the page is the chat.
+      await page.getByText(label === "desktop" ? "שאלו על נתוני המערכת" : "שאל שאלה על נתוני השיבוץ").waitFor({ timeout: 15000 });
       check(`${label}: chat empty state`, true);
       check(`${label}: chat has no horizontal scroll`, await noHScroll(page));
       if (label === "desktop") {
-        const navLink = page.locator("nav a[href='/admin/insights']");
-        check("desktop: sidebar shows assistant", await navLink.waitFor({ timeout: 10000 }).then(() => true, () => false));
+        const toggle = page.getByRole("button", { name: "סגירת העוזר" });
+        check("desktop: header toggle shows the panel open", await toggle.waitFor({ timeout: 10000 }).then(() => true, () => false));
+        check("desktop: sidebar links saved views", await page.locator("nav a[href='/admin/insights/saved']").isVisible());
       } else {
         await page.goto(B + "/admin/more");
         await page.locator("main a[href='/admin/insights']").waitFor({ timeout: 10000 });
@@ -116,10 +118,10 @@ try {
       }
 
       if (LIVE && label === "desktop") {
-        await page.locator("textarea").fill("אילו דרגות יש במערכת? הצג אותן בטבלה.");
+        await page.locator("aside textarea").fill("אילו דרגות יש במערכת? הצג אותן בטבלה.");
         await page.keyboard.press("Enter");
-        check("live: stop button while running", await page.getByLabel("עצור").isVisible({ timeout: 5000 }).catch(() => false));
-        await page.getByLabel("שלח").waitFor({ timeout: 60000 });
+        check("live: stop button while running", await page.getByRole("button", { name: "עצירה" }).waitFor({ timeout: 5000 }).then(() => true, () => false));
+        await page.getByRole("button", { name: "שליחה" }).waitFor({ timeout: 60000 });
         const tables = await page.locator("table").count();
         const text = await page.locator("p.whitespace-pre-wrap").allInnerTexts();
         check("live: answer rendered a table", tables > 0, `tables=${tables} text=${text.join(" | ").slice(0, 200)}`);

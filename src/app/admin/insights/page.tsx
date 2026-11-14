@@ -1,105 +1,47 @@
 "use client";
 
 /**
- * /admin/insights: chat with the insights assistant. The thread is in-memory
- * only (lost on reload). Charts and tables arrive as finished tool results
- * with rows joined server-side.
- *
- * Streaming replaces the last turn on every text delta. Turns and chart/table
- * cards are memoized on their (immutable) objects, so only the running turn's
- * text re-renders, and the view follows new output (including charts growing
- * after layout) only while the user is already at the bottom.
+ * /admin/insights. On mobile: the chat itself, in-memory only (lost on
+ * reload). On desktop the assistant is the panel docked beside every admin
+ * page (AssistantPanel in the layout), so this route just opens it.
  */
 import Link from "next/link";
-import { memo, useEffect, useRef, useState } from "react";
-import { ArrowUp, Square, Loader2, RotateCcw, LayoutGrid, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowUp, Square, RotateCcw, LayoutGrid } from "lucide-react";
 import { useSelectedQuarter } from "@/lib/selected-quarter";
+import { useIsMobile } from "@/lib/use-media";
 import { useInsightsChat } from "@/lib/insights/use-insights-chat";
-import {
-  isChartPart, isTablePart, revealAliases, TOOL_LABELS, type AssistantPart, type AssistantTurn, type ThreadMessage,
-} from "@/lib/insights/chat-client";
-import { InsightCard, type InsightCardContent } from "@/components/insights/insight-card";
-import { SaveViewButton } from "@/components/insights/save-view-dialog";
+import { setAssistantOpen } from "@/lib/insights/panel-store";
 import { BudgetIndicator, useInsightsUsage } from "@/components/insights/budget-indicator";
+import {
+  EXAMPLES, NotConfiguredNotice, PSEUDONYMIZE_NOTE, Thread, useFollowScroll,
+} from "@/components/insights/chat-thread";
 
-const EXAMPLES = [
-  "כמה משמרות סופ״ש עשה כל עובד השנה?",
-  "מי לא שובץ ברבעון הנוכחי?",
-  "הצג התפלגות זמינות לפי דרגה",
-  "אילו תאריכים ברבעון חסרים עתודה?",
-];
+export default function InsightsPage() {
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    if (isMobile === false) setAssistantOpen(true);
+  }, [isMobile]);
 
-/** Re-renders only when its part object changes (never while later text streams in). */
-const PartCard = memo(function PartCard({ part, question }: { part: AssistantPart; question: string }) {
-  const content: InsightCardContent | null = isChartPart(part)
-    ? { kind: "chart", spec: part.result }
-    : isTablePart(part)
-      ? { kind: "table", spec: part.result }
-      : null;
-  if (!content) return null;
-  return <InsightCard {...content} actions={<SaveViewButton content={content} question={question} />} />;
-});
+  if (isMobile === null) return null;
+  return isMobile ? <MobileChat /> : <DesktopHint />;
+}
 
-const AssistantMessage = memo(function AssistantMessage({ turn, question }: { turn: AssistantTurn; question: string }) {
-  const running = turn.parts.filter((p) => p.type === "tool" && p.status === "running");
-  // Busy unless text is streaming: no output yet, a tool running, or waiting for the model after a tool.
-  const busy = turn.status === "running" && turn.parts[turn.parts.length - 1]?.type !== "text";
+function DesktopHint() {
+  const usage = useInsightsUsage(0);
+  if (!usage) return null;
+  if (!usage.enabled) return <NotConfiguredNotice usage={usage} />;
   return (
-    <div className="flex flex-col gap-3 min-w-0">
-      {turn.parts.map((p, i) => {
-        if (p.type === "text") {
-          return p.text.trim() ? (
-            <p key={i} className="whitespace-pre-wrap leading-relaxed text-[13.5px] m-0">{revealAliases(p.text, turn.aliases)}</p>
-          ) : null;
-        }
-        return <PartCard key={p.id} part={p} question={question} />;
-      })}
-      {busy && (
-        <div className="flex items-center gap-2 text-[12px] nocturne-text-muted">
-          <Loader2 className="size-3.5 animate-spin" />
-          {running.length > 0 && running[0].type === "tool"
-            ? `${TOOL_LABELS[running[0].toolName] ?? "מעבד"}…`
-            : "חושב…"}
-        </div>
-      )}
-      {turn.notices.map((n, i) => (
-        <div key={i} className="flex items-center gap-2 text-[12px] nocturne-warning">
-          <AlertTriangle className="size-3.5" /> {n}
-        </div>
-      ))}
-      {turn.error && <div className="text-[12px] nocturne-error">{turn.error}</div>}
-      {turn.status === "cancelled" && <div className="text-[11px] nocturne-text-muted">הופסק</div>}
+    <div className="max-w-xl rounded-xl border border-white/5 nocturne-surface p-4 text-[13px] flex flex-col gap-2">
+      <p className="m-0">העוזר זמין בחלונית הצד בכל עמודי הניהול, דרך הכפתור ״עוזר AI״ בסרגל העליון.</p>
+      <Link href="/admin/insights/saved" className="inline-flex items-center gap-1 nocturne-accent hover:opacity-80">
+        <LayoutGrid className="size-3.5" /> תצוגות שמורות
+      </Link>
     </div>
-  );
-});
-
-const UserMessage = memo(function UserMessage({ text }: { text: string }) {
-  return (
-    <div className="self-start max-w-[85%] rounded-2xl rounded-tr-sm px-3.5 py-2 text-[13.5px] whitespace-pre-wrap nocturne-accent-badge">
-      {text}
-    </div>
-  );
-});
-
-function Thread({ thread }: { thread: ThreadMessage[] }) {
-  return (
-    <>
-      {thread.map((m, i) =>
-        m.role === "user" ? (
-          <UserMessage key={m.id} text={m.text} />
-        ) : (
-          <AssistantMessage
-            key={m.id}
-            turn={m}
-            question={(thread[i - 1] && thread[i - 1].role === "user" ? (thread[i - 1] as { text: string }).text : "")}
-          />
-        ),
-      )}
-    </>
   );
 }
 
-export default function InsightsPage() {
+function MobileChat() {
   const selectedQuarterId = useSelectedQuarter();
   const [usageKey, setUsageKey] = useState(0);
   const usage = useInsightsUsage(usageKey);
@@ -108,52 +50,18 @@ export default function InsightsPage() {
     onTurnEnd: () => setUsageKey((k) => k + 1),
   });
   const [input, setInput] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  /** Follow new output only while the user hasn't scrolled up to read. */
-  const stickRef = useRef(true);
-
-  const contentRef = useRef<HTMLDivElement>(null);
   const disabled = !!usage && !usage.enabled;
-
-  // Follow size changes, not just thread updates: charts measure and grow after the commit,
-  // and the container shrinks when the notice or textarea below it grows.
-  useEffect(() => {
-    const el = scrollRef.current;
-    const content = contentRef.current;
-    if (!el || !content) return;
-    const follow = () => {
-      if (stickRef.current) el.scrollTop = el.scrollHeight;
-    };
-    follow();
-    const ro = new ResizeObserver(follow);
-    ro.observe(content);
-    ro.observe(el); // container shrinks too (notice/textarea/keyboard), content height unchanged
-    return () => ro.disconnect();
-  }, [disabled]); // the "not configured" early return unmounts both divs
-
-  function onScroll() {
-    const el = scrollRef.current;
-    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-  }
+  // The "not configured" early return unmounts both divs.
+  const { scrollRef, contentRef, onScroll, stick } = useFollowScroll(disabled);
 
   function submit(text = input) {
     if (!text.trim() || running) return;
-    stickRef.current = true;
+    stick();
     void send(text);
     setInput("");
   }
 
-  if (disabled) {
-    return (
-      <div className="max-w-xl rounded-xl border border-white/5 nocturne-surface p-4 text-[13px]">
-        {usage?.misconfigured === "alias_secret" ? (
-          <>INSIGHTS_PSEUDONYMIZE פעיל אך חסר סוד לכינויים. יש להגדיר <code dir="ltr">INSIGHTS_ALIAS_SECRET</code> (או <code dir="ltr">SESSION_SECRET</code>) בקובץ הסביבה ולהפעיל מחדש.</>
-        ) : (
-          <>העוזר אינו מוגדר בשרת. יש להגדיר <code dir="ltr">ANTHROPIC_API_KEY</code> בקובץ הסביבה ולהפעיל מחדש.</>
-        )}
-      </div>
-    );
-  }
+  if (disabled) return <NotConfiguredNotice usage={usage} />;
 
   return (
     <div className="h-full flex flex-col max-w-4xl mx-auto w-full gap-3">
@@ -229,7 +137,7 @@ export default function InsightsPage() {
       </form>
       {usage?.pseudonymize && (
         <p className="text-[11px] nocturne-text-muted m-0 -mt-1">
-          שמות ומספרי עובדים מוחלפים בכינויים לפני השליחה לשירות. ההחלפה מדויקת בלבד: כינויי חיבה, שגיאות כתיב ומספרי עובד קצרים מ-5 ספרות נשלחים כפי שנכתבו. העדף שם מלא.
+          {PSEUDONYMIZE_NOTE}
         </p>
       )}
     </div>

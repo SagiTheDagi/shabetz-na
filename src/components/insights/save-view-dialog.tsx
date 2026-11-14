@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { InsightCardContent } from "./insight-card";
 
+/** Fired on window after a view is saved, so an open saved-views list reloads. */
+export const SAVED_VIEWS_CHANGED = "shabetz:insights-saved";
+
 export function SaveViewButton({ content, question }: { content: InsightCardContent; question: string }) {
   const { kind, spec } = content;
   const [open, setOpen] = useState(false);
@@ -38,6 +41,8 @@ export function SaveViewButton({ content, question }: { content: InsightCardCont
         return;
       }
       toast.success("התצוגה נשמרה");
+      // The desktop panel can save while /admin/insights/saved is on screen.
+      window.dispatchEvent(new Event(SAVED_VIEWS_CHANGED));
       setOpen(false);
     } catch {
       toast.error("שמירת התצוגה נכשלה");

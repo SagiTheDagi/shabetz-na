@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * In-memory chat thread for /admin/insights: POSTs the thread to
+ * In-memory chat thread (desktop assistant panel, mobile /admin/insights): POSTs the thread to
  * /api/insights/chat and folds the NDJSON events into the last assistant
  * turn. stop() aborts the fetch; the server sees the abort and stops the loop.
- * Unmounting (leaving the page) aborts too, so no budget goes to an unseen answer.
+ * Unmounting aborts too (leaving the mobile page; the desktop panel stays mounted
+ * while closed, so closing it mid-answer lets the answer finish).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {

@@ -7,6 +7,7 @@
  * "outdated" and can only be deleted.
  */
 import Link from "next/link";
+import { SAVED_VIEWS_CHANGED } from "@/components/insights/save-view-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Trash2, MessageSquare } from "lucide-react";
@@ -138,6 +139,10 @@ export default function SavedInsightsPage() {
       .catch(() => setError("טעינת התצוגות השמורות נכשלה"));
   }, []);
   useEffect(load, [load]);
+  useEffect(() => {
+    window.addEventListener(SAVED_VIEWS_CHANGED, load);
+    return () => window.removeEventListener(SAVED_VIEWS_CHANGED, load);
+  }, [load]);
 
   if (error) {
     return (

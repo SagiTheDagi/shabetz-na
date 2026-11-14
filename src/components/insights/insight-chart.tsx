@@ -8,7 +8,7 @@
  * Colors: --chart-1..5 is a single purple ramp whose dark end disappears on
  * the card, so series and slices use a categorical palette of distinct hues
  * (all mid-tone, readable on dark and light). Specs allow at most
- * PALETTE.length series; pies fold the smallest slices into "אחר".
+ * MAX_CHART_SERIES series; pies fold the smallest slices into "אחר".
  */
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis,
@@ -17,18 +17,21 @@ import {
   ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig,
 } from "@/components/ui/chart";
 import type { ChartSpec } from "@/lib/insights/render";
+import { CHART_PALETTE } from "@/lib/insights/config";
+import { HeatmapCalendar } from "./heatmap-calendar";
 
-export const PALETTE = ["#9184d9", "#56b4e9", "#e69f00", "#2fb58f", "#cc79a7", "#e07a5f", "#d8c95a", "#8a96ab"];
-const color = (i: number) => PALETTE[i % PALETTE.length];
+const color = (i: number) => CHART_PALETTE[i % CHART_PALETTE.length];
 const OTHER_LABEL = "אחר";
 const HORIZONTAL_BAR_THRESHOLD = 12;
+const HORIZONTAL_BAR_ROW_PX = 28;
+const HORIZONTAL_BAR_MAX_VIEW_PX = 900;
 
-/** At most PALETTE.length slices: the largest ones, the rest summed into "אחר". */
+/** At most CHART_PALETTE.length slices: the largest ones, the rest summed into "אחר". */
 export function foldPieSlices<T extends Record<string, string | number | null>>(data: T[], xKey: string, vKey: string): T[] {
-  if (data.length <= PALETTE.length) return data;
+  if (data.length <= CHART_PALETTE.length) return data;
   const sorted = [...data].sort((a, b) => Number(b[vKey] ?? 0) - Number(a[vKey] ?? 0));
-  const keep = sorted.slice(0, PALETTE.length - 1);
-  const rest = sorted.slice(PALETTE.length - 1).reduce((n, r) => n + Number(r[vKey] ?? 0), 0);
+  const keep = sorted.slice(0, CHART_PALETTE.length - 1);
+  const rest = sorted.slice(CHART_PALETTE.length - 1).reduce((n, r) => n + Number(r[vKey] ?? 0), 0);
   return [...keep, { [xKey]: OTHER_LABEL, [vKey]: rest } as T];
 }
 
@@ -38,13 +41,15 @@ function normalize(spec: ChartSpec) {
     const out: Record<string, string | number | null> = { [spec.x.key]: row[spec.x.key] ?? "" };
     for (const s of spec.series) {
       const v = row[s.key];
-      out[s.key] = v === null || v === undefined || v === "" ? null : Number(v);
+      const n = v === null || v === undefined || v === "" ? NaN : Number(v);
+      out[s.key] = Number.isFinite(n) ? n : null; // text in a series column → gap, never NaN
     }
     return out;
   });
 }
 
 export function InsightChart({ spec }: { spec: ChartSpec }) {
+  if (spec.kind === "heatmap_calendar") return <HeatmapCalendar spec={spec} />;
 
   const data = normalize(spec);
   const config: ChartConfig = Object.fromEntries(
@@ -75,25 +80,30 @@ export function InsightChart({ spec }: { spec: ChartSpec }) {
   const legend = spec.series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null;
   const tooltip = <ChartTooltip content={<ChartTooltipContent />} />;
   const xIsNumber = spec.x.type === "number";
+  // Integer ticks for counts; fractional data (ratios, averages) needs decimals.
+  const decimals = data.some((r) => spec.series.some((s) => { const v = r[s.key]; return typeof v === "number" && !Number.isInteger(v); }));
 
   if (spec.kind === "bar" || spec.kind === "stacked_bar") {
     const stack = spec.kind === "stacked_bar" ? "a" : undefined;
     const horizontal = data.length > HORIZONTAL_BAR_THRESHOLD;
     if (horizontal) {
-      // Many categories: horizontal bars, labels readable on the right.
+      // Many categories: horizontal bars, labels readable on the right. Full
+      // height per row (labels never overlap); the card scrolls past 900px.
       return (
-        <ChartContainer config={config} className="aspect-auto w-full" style={{ height: Math.min(28 * data.length + 60, 900) }}>
-          <BarChart data={data} layout="vertical" margin={{ left: 8, right: 8 }}>
-            <CartesianGrid horizontal={false} />
-            <XAxis type="number" reversed allowDecimals={false} tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey={spec.x.key} orientation="right" width={110} tickLine={false} axisLine={false} interval={0} />
-            {tooltip}
-            {legend}
-            {spec.series.map((s, i) => (
-              <Bar key={s.key} dataKey={s.key} fill={color(i)} stackId={stack} radius={stack ? 0 : 4} />
-            ))}
-          </BarChart>
-        </ChartContainer>
+        <div className="w-full overflow-y-auto" style={{ maxHeight: HORIZONTAL_BAR_MAX_VIEW_PX }}>
+          <ChartContainer config={config} className="aspect-auto w-full" style={{ height: HORIZONTAL_BAR_ROW_PX * data.length + 60 }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 8, right: 8 }}>
+              <CartesianGrid horizontal={false} />
+              <XAxis type="number" reversed allowDecimals={decimals} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey={spec.x.key} orientation="right" width={110} tickLine={false} axisLine={false} interval={0} />
+              {tooltip}
+              {legend}
+              {spec.series.map((s, i) => (
+                <Bar key={s.key} dataKey={s.key} fill={color(i)} stackId={stack} radius={stack ? 0 : 4} />
+              ))}
+            </BarChart>
+          </ChartContainer>
+        </div>
       );
     }
     return (
@@ -101,7 +111,7 @@ export function InsightChart({ spec }: { spec: ChartSpec }) {
         <BarChart data={data} margin={{ top: 8, left: 8, right: 8 }}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey={spec.x.key} reversed tickLine={false} axisLine={false} interval={0} tickMargin={8} />
-          <YAxis orientation="right" allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+          <YAxis orientation="right" allowDecimals={decimals} tickLine={false} axisLine={false} width={36} />
           {tooltip}
           {legend}
           {spec.series.map((s, i) => (

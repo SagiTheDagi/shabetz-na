@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  isIsoDate,
   fromIsoDate,
   hebrewDayName,
   isWeekend,
@@ -45,4 +46,9 @@ test("isWeekend is Thu-Sat only", () => {
   const flags = [4, 5, 6, 7, 8, 9, 10].map((day) => isWeekend(new Date(2026, 0, day)));
   // Jan 4 2026 = Sunday .. Jan 10 = Saturday
   assert.deepEqual(flags, [false, false, false, false, true, true, true]);
+});
+
+test("isIsoDate: real calendar dates only, no timezone, any 4-digit year", () => {
+  for (const d of ["2026-02-28", "2024-02-29", "2000-02-29", "0099-01-01", "2026-12-31"]) assert.ok(isIsoDate(d), d);
+  for (const d of ["2026-02-29", "1900-02-29", "2026-02-30", "2026-13-01", "2026-00-10", "2026-01-00", "2026-1-01", "26-01-01"]) assert.ok(!isIsoDate(d), d);
 });

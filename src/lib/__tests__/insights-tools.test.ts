@@ -18,7 +18,8 @@ import {
   quarterCoverage, availabilitySummary, workerHistory, justiceChart, toAnthropicTool, DOMAIN_TOOLS,
   type QueryTool, type ToolCtx,
 } from "../insights/tools";
-import { renderChart, renderTable, MAX_RENDER_ROWS } from "../insights/render";
+import { chartFromResult, renderChart, renderTable } from "../insights/render";
+import { MAX_RENDER_ROWS } from "../insights/config";
 
 let db: Database.Database;
 let store: ResultStore;
@@ -347,8 +348,60 @@ describe("render tools", () => {
     assert.throws(() => renderChart(chart(result_id, { series: [{ key: "nope", label: "x" }] }), store), /Unknown column\(s\): nope/);
     assert.throws(() => renderChart(chart(result_id, { x: { key: "zz", label: "x", type: "category" } }), store), ToolError);
     assert.throws(() => renderChart(chart("r_missing"), store), /unknown or expired/);
+    assert.throws(() => renderChart(chart(result_id, { series: [{ key: "shifts", label: "a" }], x: { key: "shifts", label: "x", type: "category" } }), store), /x key/);
+    // Saved views re-run through chartFromResult: ones saved before the x-key check keep working.
+    const { title, kind } = chart(result_id) as { title: string; kind: "bar" };
+    assert.doesNotThrow(() => chartFromResult({ title, kind, x: { key: "shifts", label: "x", type: "category" }, series: [{ key: "shifts", label: "a" }] }, store.get(result_id)!));
     assert.throws(() => renderTable({ result_id, title: "t", columns: [{ key: "bad", label: "b" }] }, store), ToolError);
     assert.throws(() => renderChart(chart(result_id, { kind: "pie", series: [{ key: "shifts", label: "a" }, { key: "weekend_shifts", label: "b" }] }), store), /pie/);
+  });
+
+  it("heatmap_calendar rejects x values that aren't YYYY-MM-DD", () => {
+    const hm = (date: string | null) => {
+      const id = store.put({ source: { tool: "x", args: {} }, columns: ["d", "n"], rows: [{ d: "2026-01-05", n: 1 }, { d: date, n: 2 }] });
+      return () => renderChart({ result_id: id, kind: "heatmap_calendar", title: "t", x: { key: "d", label: "d", type: "date" }, series: [{ key: "n", label: "n" }] }, store);
+    };
+    assert.doesNotThrow(hm(null));
+    assert.throws(hm("2026-01-05 10:22:00"), /YYYY-MM-DD/);
+    assert.throws(hm("2026-01"), /YYYY-MM-DD/);
+    assert.throws(hm("2026-02-30"), /YYYY-MM-DD/);
+    assert.doesNotThrow(hm("2027-01-10"));
+    assert.throws(hm("2027-01-11"), /at most/);
+  });
+
+  it("heatmap_calendar: one series, rows within MAX_RENDER_ROWS; saved re-runs keep the latest days", () => {
+    const id = store.put({ source: { tool: "x", args: {} }, columns: ["d", "n", "m"], rows: [{ d: "2026-01-05", n: 1, m: 2 }] });
+    const spec = { result_id: id, kind: "heatmap_calendar", title: "t", x: { key: "d", label: "d", type: "date" } };
+    assert.throws(() => renderChart({ ...spec, series: [{ key: "n", label: "n" }, { key: "m", label: "m" }] }, store), /exactly one series/);
+    const many = Array.from({ length: MAX_RENDER_ROWS + 1 }, (_, i) => ({ d: "2026-01-05", n: i }));
+    const big = store.put({ source: { tool: "x", args: {} }, columns: ["d", "n"], rows: many });
+    assert.throws(() => renderChart({ ...spec, result_id: big, series: [{ key: "n", label: "n" }] }, store), /GROUP BY date/);
+    const days = Array.from({ length: MAX_RENDER_ROWS + 10 }, (_, i) => ({ d: `2026-01-01+${i}`, n: i }))
+      .map((r, i) => ({ ...r, d: new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10) }));
+    const out = chartFromResult(
+      { kind: "heatmap_calendar", title: "t", x: { key: "d", label: "d", type: "date" }, series: [{ key: "n", label: "n" }] },
+      { source: { tool: "x", args: {} }, columns: ["d", "n"], rows: days },
+    );
+    assert.equal(out.spec.data.length, MAX_RENDER_ROWS);
+    assert.ok(out.spec.data.some((r) => r.d === days.at(-1)!.d), "latest day kept");
+    // Several rows per date: summed per day before the cut, so no day is split.
+    const hmSpec = { kind: "heatmap_calendar" as const, title: "t", x: { key: "d", label: "d", type: "date" as const }, series: [{ key: "n", label: "n" }] };
+    const doubled = days.flatMap((r) => [r, { ...r, n: 1 }]);
+    const cut = chartFromResult(hmSpec, { source: { tool: "x", args: {} }, columns: ["d", "n"], rows: doubled });
+    assert.equal(cut.spec.data.length, MAX_RENDER_ROWS);
+    const last = days.at(-1)!;
+    assert.deepEqual(cut.spec.data[0], { d: last.d, n: (last.n as number) + 1 });
+    // One date with more rows than the cap still comes back (summed), not empty.
+    const oneDay = Array.from({ length: MAX_RENDER_ROWS + 5 }, () => ({ d: "2026-01-05", n: 1 }));
+    assert.deepEqual(chartFromResult(hmSpec, { source: { tool: "x", args: {} }, columns: ["d", "n"], rows: oneDay }).spec.data, [{ d: "2026-01-05", n: MAX_RENDER_ROWS + 5 }]);
+  });
+
+  it("render keys go through resolveKey before the column check", () => {
+    const id = store.put({ source: { tool: "x", args: {} }, columns: ["real", "n"], rows: [{ real: "a", n: 1 }] });
+    const resolve = (k: string) => (k === "alias" ? "real" : k);
+    const out = renderChart({ result_id: id, kind: "bar", title: "t", x: { key: "alias", label: "x", type: "category" }, series: [{ key: "n", label: "n" }] }, store, "", resolve);
+    assert.equal(out.spec.x.key, "real");
+    assert.equal(renderTable({ result_id: id, title: "t", columns: [{ key: "alias", label: "x" }] }, store, "", resolve).spec.columns[0].key, "real");
   });
 
   it("render_table defaults to every column and caps rows", () => {

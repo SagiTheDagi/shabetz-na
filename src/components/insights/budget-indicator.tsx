@@ -2,8 +2,9 @@
 
 /**
  * Usage of the assistant: useInsightsUsage ("$x / $5", refreshes when
- * `refreshKey` changes) and useInsightsEnabled (nav entries; one request per
- * page load, shared by the layout and /admin/more).
+ * `refreshKey` changes) and useInsightsEnabled (nav entries). Both read one
+ * shared request: the layout's fetch is reused by /admin/insights on mount
+ * while it's fresh, and enabled is fetched once per page load.
  */
 import { useEffect, useState } from "react";
 
@@ -12,19 +13,36 @@ export interface InsightsUsage {
   cost_usd: number;
   cap: number;
   enabled: boolean;
+  pseudonymize?: boolean;
+  /** Set with enabled: false when the API key is there but a required setting isn't. */
+  misconfigured?: "alias_secret";
 }
 
-function fetchInsightsUsage(): Promise<InsightsUsage | null> {
-  return fetch("/api/insights/usage")
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+const REUSE_MS = 5_000;
+let shared: { at: number; p: Promise<InsightsUsage | null> } | null = null;
+
+/** Shared /api/insights/usage request; `fresh` forces a new one (after a turn). */
+function loadUsage(fresh: boolean): Promise<InsightsUsage | null> {
+  if (!fresh && shared && Date.now() - shared.at < REUSE_MS) return shared.p;
+  const entry = {
+    at: Date.now(),
+    p: fetch("/api/insights/usage")
+      .then((r) => (r.ok ? (r.json() as Promise<InsightsUsage>) : null))
+      .catch(() => null),
+  };
+  shared = entry;
+  // Don't reuse a failure (transient error, 401 mid-login): the next caller retries.
+  entry.p.then((u) => {
+    if (!u && shared === entry) shared = null;
+  });
+  return entry.p;
 }
 
 export function useInsightsUsage(refreshKey: number) {
   const [usage, setUsage] = useState<InsightsUsage | null>(null);
   useEffect(() => {
     let alive = true;
-    fetchInsightsUsage().then((u) => alive && setUsage(u));
+    loadUsage(refreshKey > 0).then((u) => alive && setUsage(u));
     return () => {
       alive = false;
     };
@@ -33,15 +51,16 @@ export function useInsightsUsage(refreshKey: number) {
 }
 
 // Whether the server has a key doesn't change while the page is open.
+// Misconfigured counts as enabled for the nav: the page shows the setup message.
 let enabledPromise: Promise<boolean> | null = null;
 
 export function useInsightsEnabled(): boolean {
   const [enabled, setEnabled] = useState(false);
   useEffect(() => {
     let alive = true;
-    const p = (enabledPromise ??= fetchInsightsUsage().then((u) => {
+    const p = (enabledPromise ??= loadUsage(false).then((u) => {
       if (!u) enabledPromise = null; // failed or not admin: retry on next mount
-      return !!u?.enabled;
+      return !!(u?.enabled || u?.misconfigured);
     }));
     p.then((v) => alive && setEnabled(v));
     return () => {

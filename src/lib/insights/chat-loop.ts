@@ -16,7 +16,7 @@ import { buildSystem } from "./prompt";
 import { ToolError } from "./errors";
 import { executeQueryTool, toAnthropicTool, type QueryTool, type ToolCtx } from "./tools";
 import { QUERY_TOOLS, QUERY_TOOL_MAP } from "./query-tools";
-import { RENDER_TOOLS, renderChart, renderTable } from "./render";
+import { RENDER_TOOLS, renderChart, renderTable, type KeyResolver } from "./render";
 
 export const MAX_ITERATIONS = 8;
 export const MAX_TOKENS = 4096;
@@ -38,6 +38,7 @@ export type ChatEvent =
   | { type: "tool_call"; id: string; name: string; args: unknown }
   | { type: "tool_result"; id: string; name: string; result: unknown; is_error?: boolean }
   | { type: "notice"; message: string }
+  | { type: "aliases"; map: Record<string, string> }
   | { type: "error"; message: string }
   | { type: "done" };
 
@@ -77,6 +78,8 @@ export interface ChatLoopInput {
   mapForModel?: (value: unknown) => unknown;
   /** Hook for pseudonymization: maps what the client sees. */
   mapForClient?: (value: unknown) => unknown;
+  /** Hook for pseudonymization: render_* key → the stored column it names. */
+  resolveKey?: KeyResolver;
 }
 
 /** Block types that accept cache_control (thinking blocks don't). */
@@ -156,8 +159,8 @@ async function runTool(block: Anthropic.ToolUseBlock, input: ChatLoopInput): Pro
       // result_id, not query input. mapForClient turns aliases in them into names.
       const out =
         block.name === "render_chart"
-          ? renderChart(block.input, toolCtx.store, toolCtx.owner)
-          : renderTable(block.input, toolCtx.store, toolCtx.owner);
+          ? renderChart(block.input, toolCtx.store, toolCtx.owner, input.resolveKey)
+          : renderTable(block.input, toolCtx.store, toolCtx.owner, input.resolveKey);
       return { forModel: JSON.stringify(out.forModel), forClient: out.spec, isError: false };
     }
     const tool = QUERY_TOOL_MAP.get(block.name);

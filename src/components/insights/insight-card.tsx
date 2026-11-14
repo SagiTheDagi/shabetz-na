@@ -3,6 +3,7 @@
 /** A chart or table result in a card, with optional actions (save, delete). */
 import type { ReactNode } from "react";
 import type { ChartSpec, TableSpec } from "@/lib/insights/render";
+import { MAX_RENDER_ROWS } from "@/lib/insights/config";
 import { InsightChart } from "./insight-chart";
 import { InsightTable } from "./insight-table";
 
@@ -25,8 +26,9 @@ export function InsightCard({
         <div className="mr-auto flex items-center gap-3">{actions}</div>
       </div>
       {content.kind === "chart" ? <InsightChart spec={content.spec} /> : <InsightTable spec={content.spec} />}
-      {content.kind === "chart" && content.spec.truncated && (
-        <p className="text-[11px] nocturne-text-muted">מוצגות 500 השורות הראשונות בלבד.</p>
+      {/* A truncated heatmap holds > MAX_HEATMAP_DAYS days, so the calendar's own clip note covers it. */}
+      {spec.truncated && !(content.kind === "chart" && content.spec.kind === "heatmap_calendar") && (
+        <p className="text-[11px] nocturne-text-muted">מוצגות {MAX_RENDER_ROWS} השורות הראשונות בלבד.</p>
       )}
     </div>
   );

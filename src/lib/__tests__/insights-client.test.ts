@@ -1,8 +1,9 @@
-/** Client-side pure helpers for /admin/insights: chat event reducer, wire format, table sort. */
+/** Client-side pure helpers for /admin/insights: chat event reducer, wire format, table sort, CSV. */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { applyEvent, splitLines, toWireMessages, WIRE_MAX_MESSAGES, type AssistantTurn, type ThreadMessage } from "../insights/chat-client";
-import { sortRows } from "../insights/csv";
+import { applyEvent, createRequestSlot, readNdjson, splitLines, toWireMessages, WIRE_MAX_MESSAGES, type AssistantTurn, type ThreadMessage } from "../insights/chat-client";
+import { toCsv, sortRows } from "../insights/csv";
+import type { Row } from "../insights/result-store";
 import { buildHistory, chatRequestSchema, MAX_TURNS } from "../insights/prompt";
 
 describe("chat client helpers", () => {
@@ -60,6 +61,22 @@ describe("chat client helpers", () => {
     assert.ok(text.includes("[query cancelled, no result: shifts_per_worker"), text);
   });
 
+  it("unanswered questions (empty assistant turn) are dropped with their reply", () => {
+    const thread: ThreadMessage[] = [
+      { id: "u0", role: "user", text: "q0" },
+      { ...empty(), id: "a0", status: "done", parts: [{ type: "text", text: "a0" }] },
+      { id: "u1", role: "user", text: "q1" },
+      { ...empty(), id: "a1", status: "done", error: "budget" },
+      { id: "u2", role: "user", text: "q2" },
+      { ...empty(), id: "a2", status: "cancelled", parts: [{ type: "text", text: "  " }] },
+      { id: "u3", role: "user", text: "q3" },
+    ];
+    const wire = toWireMessages(thread);
+    assert.deepEqual(wire.map((m) => m.role), ["user", "assistant", "user"]);
+    const hist = buildHistory(wire);
+    assert.equal(hist[hist.length - 1].content, "q3");
+  });
+
   it("long threads send only recent messages and stay under the request cap", () => {
     const thread: ThreadMessage[] = [];
     for (let i = 0; i < 150; i++) {
@@ -74,10 +91,75 @@ describe("chat client helpers", () => {
   });
 });
 
-describe("table sort", () => {
+describe("csv", () => {
+  it("BOM, quoting, formula neutralization", () => {
+    const csv = toCsv([{ key: "a", label: "שם" }, { key: "b", label: "ערך" }], [
+      { a: 'אבי, "הגדול"', b: 3 },
+      { a: "=HYPERLINK(1)", b: -2 },
+      { a: null, b: null },
+      { a: "\t=1+1", b: "\r=cmd" },
+    ]);
+    assert.ok(csv.startsWith("﻿"));
+    assert.equal(csv.slice(1), 'שם,ערך\r\n"אבי, ""הגדול""",3\r\n\'=HYPERLINK(1),-2\r\n,\r\n\'\t=1+1,"\'\r=cmd"\r\n');
+  });
+  it("numbers never get the formula prefix", () => {
+    assert.equal(toCsv([{ key: "n", label: "n" }], [{ n: -1e-7 }, { n: -1.5e21 }]).slice(1), "n\r\n-1e-7\r\n-1.5e+21\r\n");
+  });
+  it("object values export as JSON, like the table shows them", () => {
+    assert.equal(toCsv([{ key: "j", label: "j" }], [{ j: { a: 1 } }, { j: [1, 2] }] as unknown as Row[]).slice(1), 'j\r\n"{""a"":1}"\r\n"[1,2]"\r\n');
+  });
   it("sortRows: numeric, nulls last, stable", () => {
     const rows = [{ n: 2, k: "b" }, { n: null, k: "x" }, { n: 10, k: "a" }, { n: 2, k: "c" }];
     assert.deepEqual(sortRows(rows, "n", "desc").map((r) => r.k), ["a", "b", "c", "x"]);
     assert.deepEqual(sortRows(rows, "n", "asc").map((r) => r.k), ["b", "c", "a", "x"]);
+  });
+});
+
+describe("readNdjson", () => {
+  const streamOf = (...chunks: string[]) =>
+    new ReadableStream<string>({
+      start(c) {
+        chunks.forEach((x) => c.enqueue(x));
+        c.close();
+      },
+    });
+  const collect = async (...chunks: string[]) => {
+    const out: unknown[] = [];
+    await readNdjson(streamOf(...chunks), (e) => out.push(e));
+    return out;
+  };
+
+  it("joins lines split across chunks and skips bad lines", async () => {
+    const out = await collect('{"type":"text","de', 'lta":"a"}\nnot json\n', '{"type":"done"}\n');
+    assert.deepEqual(out, [{ type: "text", delta: "a" }, { type: "done" }]);
+  });
+
+  it("delivers a final event with no trailing newline", async () => {
+    const out = await collect('{"type":"text","delta":"a"}\n{"type":"error","message":"x"}');
+    assert.deepEqual(out, [{ type: "text", delta: "a" }, { type: "error", message: "x" }]);
+  });
+});
+
+describe("createRequestSlot", () => {
+  it("allows one request at a time", () => {
+    const slot = createRequestSlot();
+    const a = slot.acquire();
+    assert.ok(a);
+    assert.equal(slot.acquire(), null);
+    assert.equal(slot.release(a!), true);
+    assert.ok(slot.acquire());
+  });
+
+  it("reset frees the slot at once; the stale request's release is a no-op", () => {
+    const slot = createRequestSlot();
+    const old = slot.acquire()!;
+    slot.reset();
+    assert.equal(old.signal.aborted, true);
+    const next = slot.acquire(); // send right after reset is not dropped
+    assert.ok(next);
+    assert.equal(slot.release(old), false); // aborted send's finally runs late
+    assert.equal(slot.busy, true);
+    assert.equal(slot.release(next!), true);
+    assert.equal(slot.busy, false);
   });
 });

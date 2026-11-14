@@ -4,11 +4,11 @@
  * In-memory chat thread for /admin/insights: POSTs the thread to
  * /api/insights/chat and folds the NDJSON events into the last assistant
  * turn. stop() aborts the fetch; the server sees the abort and stops the loop.
+ * Unmounting (leaving the page) aborts too, so no budget goes to an unseen answer.
  */
-import { useCallback, useRef, useState } from "react";
-import type { ChatEvent } from "./chat-loop";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  applyEvent, splitLines, toWireMessages,
+  applyEvent, createRequestSlot, readNdjson, toWireMessages,
   type AssistantTurn, type ThreadMessage,
 } from "./chat-client";
 
@@ -17,88 +17,81 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 export function useInsightsChat(opts: { selectedQuarterId: string | null; onTurnEnd?: () => void }) {
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [running, setRunning] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const [slot] = useState(createRequestSlot);
   const threadRef = useRef<ThreadMessage[]>([]);
+
+  useEffect(() => () => slot.reset(), [slot]);
 
   const update = useCallback((fn: (t: ThreadMessage[]) => ThreadMessage[]) => {
     threadRef.current = fn(threadRef.current);
     setThread(threadRef.current);
   }, []);
 
-  const patchLast = useCallback(
-    (fn: (a: AssistantTurn) => AssistantTurn) =>
-      update((t) => {
-        const last = t[t.length - 1];
-        return last?.role === "assistant" ? [...t.slice(0, -1), fn(last)] : t;
-      }),
+  /** Patch one assistant turn by id (a stale, aborted send never touches a newer turn). */
+  const patchTurn = useCallback(
+    (id: string, fn: (a: AssistantTurn) => AssistantTurn) =>
+      update((t) => t.map((m) => (m.id === id && m.role === "assistant" ? fn(m) : m))),
     [update],
   );
+
+  // Latest opts without making send() depend on a fresh object every render.
+  const optsRef = useRef(opts);
+  useEffect(() => {
+    optsRef.current = opts;
+  });
 
   const send = useCallback(
     async (text: string) => {
       const q = text.trim();
-      if (!q || abortRef.current) return;
+      if (!q || slot.busy) return;
       const user: ThreadMessage = { id: newId(), role: "user", text: q };
       const assistant: AssistantTurn = { id: newId(), role: "assistant", parts: [], notices: [], status: "running" };
+      const patch = (fn: (a: AssistantTurn) => AssistantTurn) => patchTurn(assistant.id, fn);
       const wire = toWireMessages([...threadRef.current, user]);
       update((t) => [...t, user, assistant]);
 
-      const ac = new AbortController();
-      abortRef.current = ac;
+      const ac = slot.acquire()!;
       setRunning(true);
       try {
         const res = await fetch("/api/insights/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: wire, selected_quarter_id: opts.selectedQuarterId }),
+          body: JSON.stringify({ messages: wire, selected_quarter_id: optsRef.current.selectedQuarterId }),
           signal: ac.signal,
         });
         if (!res.ok || !res.body) {
           const body = await res.json().catch(() => ({}));
-          patchLast((a) => ({ ...a, error: body.error || "שגיאה בפנייה לעוזר", status: "done" }));
+          patch((a) => ({ ...a, error: body.error || "שגיאה בפנייה לעוזר", status: "done" }));
           return;
         }
-        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-        let buffer = "";
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const { lines, rest } = splitLines(buffer + value);
-          buffer = rest;
-          for (const line of lines) {
-            let e: ChatEvent;
-            try {
-              e = JSON.parse(line);
-            } catch {
-              continue;
-            }
-            patchLast((a) => applyEvent(a, e));
-          }
-        }
-        patchLast((a) => (a.status === "running" ? { ...a, status: "done" } : a));
+        await readNdjson(res.body.pipeThrough(new TextDecoderStream()), (e) => patch((a) => applyEvent(a, e)));
+        // The server always ends with "done"; a stream that closes without it was cut off.
+        patch((a) => (a.status === "running" ? { ...a, error: a.error ?? "החיבור לעוזר נקטע", status: "done" } : a));
       } catch (e) {
         if ((e as Error).name === "AbortError") {
-          patchLast((a) => ({ ...a, status: "cancelled" }));
+          patch((a) => ({ ...a, status: "cancelled" }));
         } else {
-          patchLast((a) => ({ ...a, error: "החיבור לעוזר נקטע", status: "done" }));
+          patch((a) => ({ ...a, error: "החיבור לעוזר נקטע", status: "done" }));
         }
       } finally {
-        abortRef.current = null;
-        setRunning(false);
-        opts.onTurnEnd?.();
+        // reset() may already have released this send and a newer one started:
+        // then leave `running` alone, but still fire onTurnEnd (the turn may
+        // have spent budget, so usage must refresh).
+        if (slot.release(ac)) setRunning(false);
+        optsRef.current.onTurnEnd?.();
       }
     },
-    [opts, patchLast, update],
+    [patchTurn, slot, update],
   );
 
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const stop = useCallback(() => slot.abort(), [slot]);
 
+  /** Abort and release immediately so a send right after reset isn't dropped. */
   const reset = useCallback(() => {
-    abortRef.current?.abort();
+    slot.reset();
+    setRunning(false);
     update(() => []);
-  }, [update]);
+  }, [slot, update]);
 
   return { thread, running, send, stop, reset };
 }

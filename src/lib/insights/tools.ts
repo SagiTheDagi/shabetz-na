@@ -14,6 +14,7 @@ import type { Database } from "better-sqlite3";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildChartData } from "../justice-chart";
 import { weekendRuleSql } from "../weekend-rule";
+import { isIsoDate } from "../date-utils";
 import { ToolError } from "./errors";
 import type { ResultStore, Row, ResultSource } from "./result-store";
 
@@ -54,7 +55,7 @@ export interface QueryToolResult {
   note?: string;
 }
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+const isoDate = z.string().refine(isIsoDate, "expected a real YYYY-MM-DD date");
 const quarterId = z.string().regex(/^\d{4}-Q[1-4]$/, "expected e.g. 2026-Q1");
 
 /**

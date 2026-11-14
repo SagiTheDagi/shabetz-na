@@ -12,13 +12,12 @@
 
 import type { Database } from "better-sqlite3";
 import { v4 as uuid } from "uuid";
+import { isIsoDate } from "./date-utils";
 import {
   AVAILABILITY_STATUSES,
   type AvailabilitySource,
   type AvailabilityStatus,
 } from "./types";
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface AvailabilityEntry {
   date: string;
@@ -43,7 +42,7 @@ export function validateEntries(entries: AvailabilityEntry[], label = ""): strin
   const seen = new Set<string>();
 
   for (const entry of entries) {
-    if (!entry || !ISO_DATE.test(entry.date)) {
+    if (!entry || !isIsoDate(entry.date)) {
       return `${prefix}תאריך לא תקין — ${entry?.date}`;
     }
     if (!AVAILABILITY_STATUSES.includes(entry.status)) {

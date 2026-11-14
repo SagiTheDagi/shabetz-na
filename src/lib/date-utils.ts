@@ -66,6 +66,17 @@ export function makeDate(year: number, month: number, day: number): Date | null 
   return d;
 }
 
+/** A real YYYY-MM-DD calendar date ("2026-02-30" is rejected). */
+export function isIsoDate(s: string): boolean {
+  // Pure arithmetic: no Date, so no timezone and no 19xx mapping of years < 100.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
+  return days !== undefined && d >= 1 && d <= days;
+}
+
 /** Inclusive list of ISO dates from start to end. Empty if end < start. */
 export function enumerateDates(startIso: string, endIso: string): string[] {
   const out: string[] = [];

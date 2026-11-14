@@ -15,12 +15,13 @@ import { getReadonlyDb } from "@/lib/insights/readonly-db";
 import { getResultStore } from "@/lib/insights/result-store";
 import { getBudget, BUDGET_EXCEEDED_MESSAGE } from "@/lib/insights/budget";
 import { getChatRateLimiter } from "@/lib/insights/rate-limit";
-import { insightsEnabled, NOT_CONFIGURED_MESSAGE } from "@/lib/insights/config";
+import { insightsEnabled, NOT_CONFIGURED_MESSAGE, ALIAS_SECRET_MISSING_MESSAGE, pseudonymizeMisconfigured } from "@/lib/insights/config";
 import { chatRequestSchema, buildHistory, buildContextMessage, HistoryError } from "@/lib/insights/prompt";
 import {
   runChatLoop, buildParams, estimateParamsCost, MESSAGES, DEFAULT_EFFORT,
   type ChatEvent, type Effort, type LoopClient,
 } from "@/lib/insights/chat-loop";
+import { createPseudonymizer, withAliases } from "@/lib/insights/pseudonymize";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,9 @@ export const POST = withApiErrors(async (req: Request) => {
   ensureInsightsSchema();
   if (!insightsEnabled()) {
     return NextResponse.json({ error: NOT_CONFIGURED_MESSAGE }, { status: 503 });
+  }
+  if (pseudonymizeMisconfigured()) {
+    return NextResponse.json({ error: ALIAS_SECRET_MISSING_MESSAGE }, { status: 503 });
   }
 
   const limit = getChatRateLimiter().check(session.worker_id);
@@ -58,10 +62,11 @@ export const POST = withApiErrors(async (req: Request) => {
   }
 
   const roDb = getReadonlyDb();
+  const pseudo = createPseudonymizer(roDb);
 
   let history;
   try {
-    history = buildHistory(parsed.data.messages);
+    history = buildHistory(pseudo ? pseudo.mapClientMessages(parsed.data.messages) : parsed.data.messages);
   } catch (e) {
     if (e instanceof HistoryError) {
       return NextResponse.json({ error: "השאלה ארוכה מדי או ריקה" }, { status: 400 });
@@ -109,7 +114,10 @@ export const POST = withApiErrors(async (req: Request) => {
           firstReservation: first.reservation,
           signal,
           effort,
-          emit,
+          emit: pseudo ? withAliases(emit, pseudo) : emit,
+          ...(pseudo
+            ? { mapToolInput: pseudo.mapToolInput, mapForModel: pseudo.mapForModel, mapForClient: pseudo.mapForClient, resolveKey: pseudo.resolveKey }
+            : {}),
         });
       } catch (e) {
         console.error("[insights] chat failed", e);

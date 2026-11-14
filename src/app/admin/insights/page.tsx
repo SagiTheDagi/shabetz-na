@@ -7,8 +7,8 @@
  *
  * Streaming replaces the last turn on every text delta. Turns and chart/table
  * cards are memoized on their (immutable) objects, so only the running turn's
- * text re-renders, and the view follows new output only while the user is
- * already at the bottom.
+ * text re-renders, and the view follows new output (including charts growing
+ * after layout) only while the user is already at the bottom.
  */
 import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
@@ -16,7 +16,7 @@ import { ArrowUp, Square, Loader2, RotateCcw, LayoutGrid, AlertTriangle } from "
 import { useSelectedQuarter } from "@/lib/selected-quarter";
 import { useInsightsChat } from "@/lib/insights/use-insights-chat";
 import {
-  isChartPart, isTablePart, TOOL_LABELS, type AssistantPart, type AssistantTurn, type ThreadMessage,
+  isChartPart, isTablePart, revealAliases, TOOL_LABELS, type AssistantPart, type AssistantTurn, type ThreadMessage,
 } from "@/lib/insights/chat-client";
 import { InsightCard, type InsightCardContent } from "@/components/insights/insight-card";
 import { SaveViewButton } from "@/components/insights/save-view-dialog";
@@ -42,18 +42,19 @@ const PartCard = memo(function PartCard({ part, question }: { part: AssistantPar
 
 const AssistantMessage = memo(function AssistantMessage({ turn, question }: { turn: AssistantTurn; question: string }) {
   const running = turn.parts.filter((p) => p.type === "tool" && p.status === "running");
-  const empty = turn.parts.length === 0 && turn.status === "running";
+  // Busy unless text is streaming: no output yet, a tool running, or waiting for the model after a tool.
+  const busy = turn.status === "running" && turn.parts[turn.parts.length - 1]?.type !== "text";
   return (
     <div className="flex flex-col gap-3 min-w-0">
       {turn.parts.map((p, i) => {
         if (p.type === "text") {
           return p.text.trim() ? (
-            <p key={i} className="whitespace-pre-wrap leading-relaxed text-[13.5px] m-0">{p.text}</p>
+            <p key={i} className="whitespace-pre-wrap leading-relaxed text-[13.5px] m-0">{revealAliases(p.text, turn.aliases)}</p>
           ) : null;
         }
         return <PartCard key={p.id} part={p} question={question} />;
       })}
-      {(empty || running.length > 0) && turn.status === "running" && (
+      {busy && (
         <div className="flex items-center gap-2 text-[12px] nocturne-text-muted">
           <Loader2 className="size-3.5 animate-spin" />
           {running.length > 0 && running[0].type === "tool"
@@ -111,10 +112,24 @@ export default function InsightsPage() {
   /** Follow new output only while the user hasn't scrolled up to read. */
   const stickRef = useRef(true);
 
+  const contentRef = useRef<HTMLDivElement>(null);
+  const disabled = !!usage && !usage.enabled;
+
+  // Follow size changes, not just thread updates: charts measure and grow after the commit,
+  // and the container shrinks when the notice or textarea below it grows.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [thread]);
+    const content = contentRef.current;
+    if (!el || !content) return;
+    const follow = () => {
+      if (stickRef.current) el.scrollTop = el.scrollHeight;
+    };
+    follow();
+    const ro = new ResizeObserver(follow);
+    ro.observe(content);
+    ro.observe(el); // container shrinks too (notice/textarea/keyboard), content height unchanged
+    return () => ro.disconnect();
+  }, [disabled]); // the "not configured" early return unmounts both divs
 
   function onScroll() {
     const el = scrollRef.current;
@@ -128,10 +143,14 @@ export default function InsightsPage() {
     setInput("");
   }
 
-  if (usage && !usage.enabled) {
+  if (disabled) {
     return (
       <div className="max-w-xl rounded-xl border border-white/5 nocturne-surface p-4 text-[13px]">
-        העוזר אינו מוגדר בשרת. יש להגדיר <code dir="ltr">ANTHROPIC_API_KEY</code> בקובץ הסביבה ולהפעיל מחדש.
+        {usage?.misconfigured === "alias_secret" ? (
+          <>INSIGHTS_PSEUDONYMIZE פעיל אך חסר סוד לכינויים. יש להגדיר <code dir="ltr">INSIGHTS_ALIAS_SECRET</code> (או <code dir="ltr">SESSION_SECRET</code>) בקובץ הסביבה ולהפעיל מחדש.</>
+        ) : (
+          <>העוזר אינו מוגדר בשרת. יש להגדיר <code dir="ltr">ANTHROPIC_API_KEY</code> בקובץ הסביבה ולהפעיל מחדש.</>
+        )}
       </div>
     );
   }
@@ -152,25 +171,27 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5 pb-2">
-        {thread.length === 0 ? (
-          <div className="m-auto flex flex-col items-center gap-4 text-center max-w-md py-8">
-            <p className="text-[15px] m-0">שאל שאלה על נתוני השיבוץ</p>
-            <p className="text-[12px] nocturne-text-muted m-0">
-              התשובות מבוססות על נתוני המערכת. השיחה אינה נשמרת, אך ניתן לשמור גרפים וטבלאות כתצוגות.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {EXAMPLES.map((q) => (
-                <button key={q} type="button" onClick={() => submit(q)}
-                  className="text-[12px] px-3 py-1.5 rounded-full border nocturne-border hover:bg-white/5">
-                  {q}
-                </button>
-              ))}
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto">
+        <div ref={contentRef} className="min-h-full flex flex-col gap-5 pb-2">
+          {thread.length === 0 ? (
+            <div className="m-auto flex flex-col items-center gap-4 text-center max-w-md py-8">
+              <p className="text-[15px] m-0">שאל שאלה על נתוני השיבוץ</p>
+              <p className="text-[12px] nocturne-text-muted m-0">
+                התשובות מבוססות על נתוני המערכת. השיחה אינה נשמרת, אך ניתן לשמור גרפים וטבלאות כתצוגות.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {EXAMPLES.map((q) => (
+                  <button key={q} type="button" onClick={() => submit(q)}
+                    className="text-[12px] px-3 py-1.5 rounded-full border nocturne-border hover:bg-white/5">
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <Thread thread={thread} />
-        )}
+          ) : (
+            <Thread thread={thread} />
+          )}
+        </div>
       </div>
 
       <form
@@ -206,6 +227,11 @@ export default function InsightsPage() {
           </button>
         )}
       </form>
+      {usage?.pseudonymize && (
+        <p className="text-[11px] nocturne-text-muted m-0 -mt-1">
+          שמות ומספרי עובדים מוחלפים בכינויים לפני השליחה לשירות. ההחלפה מדויקת בלבד: כינויי חיבה, שגיאות כתיב ומספרי עובד קצרים מ-5 ספרות נשלחים כפי שנכתבו. העדף שם מלא.
+        </p>
+      )}
     </div>
   );
 }

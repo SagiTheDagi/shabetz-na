@@ -80,9 +80,15 @@ function ChartContainer({
   )
 }
 
+// Keys and colors go into a <style> block verbatim, so anything that isn't a
+// plain identifier / color token (data-derived keys: names, Hebrew aliases,
+// spaces, `;}`) is skipped rather than escaped. Lookups by key still work.
+const SAFE_CSS_KEY = /^[A-Za-z0-9_-]+$/
+const SAFE_CSS_COLOR = /^[#A-Za-z0-9(),.%\s/-]+$/
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([, config]) => config.theme ?? config.color
+    ([key, config]) => SAFE_CSS_KEY.test(key) && (config.theme ?? config.color)
   )
 
   if (!colorConfig.length) {
@@ -101,7 +107,7 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ??
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    return color && SAFE_CSS_COLOR.test(color) ? `  --color-${key}: ${color};` : null
   })
   .join("\n")}
 }

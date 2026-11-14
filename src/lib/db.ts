@@ -4,16 +4,22 @@ import fs from "fs";
 
 let db: Database.Database | null = null;
 
-export function getDb(): Database.Database {
-  if (db) return db;
-
-  const dbPath =
+/** DATABASE_PATH, or ~/.shabetz-na/shabetz.db. */
+export function resolveDbPath(): string {
+  return (
     process.env.DATABASE_PATH ||
     path.join(
       process.env.HOME || process.env.USERPROFILE || ".",
       ".shabetz-na",
       "shabetz.db"
-    );
+    )
+  );
+}
+
+export function getDb(): Database.Database {
+  if (db) return db;
+
+  const dbPath = resolveDbPath();
 
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import { applyInsightsSchema } from "../src/lib/insights/views";
 
 const dbPath =
   process.env.DATABASE_PATH ||
@@ -180,6 +181,11 @@ try {
 } catch {
   // table may not exist yet; main exec block handles it
 }
+
+// AI insights: read-only ai_* views + SavedInsight / InsightUsage tables.
+// Runs last so the views see every column added above.
+applyInsightsSchema(db);
+console.log("Insights views and tables ensured.");
 
 console.log("Migration complete.");
 db.close();

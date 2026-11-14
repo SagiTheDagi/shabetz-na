@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { getStoredQuarter, setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
 import { HEBREW_DAYS, HEBREW_MONTHS, toShortDate, hebrewDayName, toIsoDate } from "@/lib/date-utils";
 import { useIsMobile } from "@/lib/use-media";
+import { countsTowardWeekendRule } from "@/lib/weekend-rule";
 import { MobileAssign } from "@/components/mobile/mobile-assign";
 
 // ---- Interfaces ----
@@ -440,7 +441,7 @@ function DroppableShiftCard({
           {toShortDate(shift.date)} {hebrewDayName(shift.date)}
         </span>
         <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 nocturne-text-muted">{shift.shift_type_name}</span>
-        {shift.is_weekend === 1 && shift.shift_type_id !== "GUARD" && (
+        {countsTowardWeekendRule(shift.shift_type_id, shift.is_weekend) && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
             סופ&quot;ש
           </span>

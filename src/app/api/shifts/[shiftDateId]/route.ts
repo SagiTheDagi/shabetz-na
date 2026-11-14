@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { countsTowardWeekendRule } from "@/lib/weekend-rule";
 import {
   isWeekendDate,
   validateShiftDate,
@@ -57,7 +58,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
       is_weekend,
       shiftDateId
     );
-    db.prepare("UPDATE ShiftHistory SET was_weekend = ? WHERE shift_date_id = ?").run(is_weekend, shiftDateId);
+    // History keeps the rule's view: an exempt type (GUARD) never counts as a weekend shift.
+    db.prepare("UPDATE ShiftHistory SET was_weekend = ? WHERE shift_date_id = ?").run(
+      countsTowardWeekendRule(draft.shift_type_id, is_weekend) ? 1 : 0,
+      shiftDateId
+    );
   })();
 
   return NextResponse.json({ ok: true });

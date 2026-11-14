@@ -46,6 +46,7 @@ const SCHEMA = `
 `;
 
 const TABLES = [
+  "SavedInsight", "InsightUsage",
   "JusticeChart",   "ShiftHistory", "ShiftAssignment", "WorkerAvailability", "ShiftDate", "Quarter",
   "Worker", "RankShiftEligibility", "ShiftType", "Rank",
 ];

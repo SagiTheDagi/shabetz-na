@@ -201,3 +201,25 @@ export interface SessionPayload {
   name: string;
   is_admin: boolean;
 }
+
+// --- AI insights ---
+
+export interface SavedInsight {
+  insight_id: string;
+  title: string;
+  question: string;
+  spec_json: string;
+  source_json: string;
+  schema_version: number;
+  created_by: string | null; // null once the creating admin's Worker row is gone
+  created_at: string;
+}
+
+export interface InsightUsage {
+  month: string; // '2026-11'
+  input_tokens: number;
+  cache_write_tokens: number;
+  cache_read_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { withApiErrors } from "@/lib/api-helpers";
 import { getWorkerWarnings } from "@/lib/shift-rules";
+import { countsTowardWeekendRule } from "@/lib/weekend-rule";
 import { v4 as uuid } from "uuid";
 
 export async function GET(req: NextRequest) {
@@ -111,7 +112,7 @@ export const POST = withApiErrors(async (req: Request) => {
     db.prepare(
       `INSERT OR REPLACE INTO ShiftHistory (history_id, worker_id, quarter_id, shift_date_id, was_weekend)
        VALUES (?, ?, ?, ?, ?)`
-    ).run(historyId, worker_id, shiftDate.quarter_id, shift_date_id, shiftDate.shift_type_id === "GUARD" ? 0 : shiftDate.is_weekend);
+    ).run(historyId, worker_id, shiftDate.quarter_id, shift_date_id, countsTowardWeekendRule(shiftDate.shift_type_id, shiftDate.is_weekend) ? 1 : 0);
   }
 
   return NextResponse.json({ assignment_id: assignmentId, warnings });

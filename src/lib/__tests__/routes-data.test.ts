@@ -99,6 +99,13 @@ describe("/api/shifts/[id]", () => {
     assert.equal((await put("zzz", { date: "2026-01-09", shift_type_id: "GUARD" })).status, 404);
     assert.equal((db.prepare("SELECT date FROM ShiftDate WHERE shift_date_id='a'").get() as { date: string }).date, "2026-01-07");
   });
+  it("PUT onto a weekend date keeps history was_weekend=0 for GUARD (weekend rule exemption)", async () => {
+    assert.equal((await put("a", { date: "2026-01-09", shift_type_id: "GUARD" })).status, 200); // Friday
+    assert.equal((db.prepare("SELECT is_weekend FROM ShiftDate WHERE shift_date_id='a'").get() as { is_weekend: number }).is_weekend, 1);
+    assert.equal(count("ShiftHistory", "was_weekend=0"), 1);
+    assert.equal((await put("a", { date: "2026-01-09", shift_type_id: "PATROL" })).status, 200);
+    assert.equal(count("ShiftHistory", "was_weekend=1"), 1);
+  });
   it("PUT keeping its own date is not a duplicate of itself", async () => {
     assert.equal((await put("a", { date: "2026-01-07", shift_type_id: "GUARD" })).status, 200);
   });

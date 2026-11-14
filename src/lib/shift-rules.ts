@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { countsTowardWeekendRule, weekendRuleSql } from "./weekend-rule";
 import type {
   AssignmentWarning,
   Worker,
@@ -98,8 +99,8 @@ export function getWorkerWarnings(
     });
   }
 
-  // Check weekend limit (max 1 per year) — GUARD shifts are exempt from this rule
-  if (shiftDate.is_weekend && shiftDate.shift_type_id !== "GUARD") {
+  // Check weekend limit (max 1 per year) — exempt shift types (GUARD) don't count
+  if (countsTowardWeekendRule(shiftDate.shift_type_id, shiftDate.is_weekend)) {
     const year = shiftDate.date.substring(0, 4);
     const weekendCount = db
       .prepare(
@@ -114,8 +115,8 @@ export function getWorkerWarnings(
       .prepare(
         `SELECT COUNT(*) as count FROM ShiftAssignment sa
          JOIN ShiftDate sd ON sd.shift_date_id = sa.shift_date_id
-         WHERE sa.worker_id = ? AND sa.role = 'shift' AND sd.is_weekend = 1
-         AND sd.shift_type_id != 'GUARD' AND sd.date LIKE ?
+         WHERE sa.worker_id = ? AND sa.role = 'shift' AND ${weekendRuleSql("sd")} = 1
+         AND sd.date LIKE ?
          AND sd.shift_date_id != ?`
       )
       .get(workerId, `${year}-%`, shiftDateId) as { count: number };

@@ -33,7 +33,10 @@ export function ShiftDateImport() {
   }, []);
 
   useEffect(() => {
-    loadData();
+    async function run() {
+      await loadData();
+    }
+    run();
   }, [loadData]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

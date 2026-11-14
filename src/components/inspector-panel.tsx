@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Phone, AlertTriangle, MessageCircle, Users, Clock, FileText, Save, Archive, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -120,10 +120,10 @@ export function InspectorPanel({
   const [editedWhatsapp, setEditedWhatsapp] = useState(worker?.in_whatsapp_group === 1);
   const [editedAllocation, setEditedAllocation] = useState(worker?.receives_shift_allocation === 1);
   const [saving, setSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-
-  // Reset state when worker changes
-  useEffect(() => {
+  // Reset state when switching to a different worker (not on every field update to `worker`).
+  const [prevWorkerId, setPrevWorkerId] = useState(worker?.worker_id);
+  if (worker?.worker_id !== prevWorkerId) {
+    setPrevWorkerId(worker?.worker_id);
     if (worker) {
       setEditedPhone(worker.phone ?? "");
       setEditedBranch(worker.branch ?? "");
@@ -134,17 +134,13 @@ export function InspectorPanel({
       setEditedExemptReason(worker.exemption_reason ?? "");
       setEditedWhatsapp(worker.in_whatsapp_group === 1);
       setEditedAllocation(worker.receives_shift_allocation === 1);
-      setHasChanges(false);
     }
-    // Reset only when switching to a different worker, not on every field update to `worker`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [worker?.worker_id]);
+  }
 
-  // Track changes
-  useEffect(() => {
-    if (!worker || !editable) return;
-    const changed = 
-      editedPhone !== (worker.phone ?? "") ||
+  const hasChanges =
+    !!worker &&
+    editable &&
+    (editedPhone !== (worker.phone ?? "") ||
       editedBranch !== (worker.branch ?? "") ||
       editedTeam !== (worker.team ?? "") ||
       editedNotes !== (worker.notes ?? "") ||
@@ -152,9 +148,7 @@ export function InspectorPanel({
       editedExempt !== (worker.is_exempt === 1) ||
       editedExemptReason !== (worker.exemption_reason ?? "") ||
       editedWhatsapp !== (worker.in_whatsapp_group === 1) ||
-      editedAllocation !== (worker.receives_shift_allocation === 1);
-    setHasChanges(changed);
-  }, [editedPhone, editedBranch, editedTeam, editedNotes, editedConstraints, editedExempt, editedExemptReason, editedWhatsapp, editedAllocation, worker, editable]);
+      editedAllocation !== (worker.receives_shift_allocation === 1));
 
   async function handleSave() {
     if (!worker) return;
@@ -179,7 +173,6 @@ export function InspectorPanel({
 
       if (res.ok) {
         toast.success("פרטי העובד נשמרו");
-        setHasChanges(false);
         // Notify parent of update
         if (onWorkerUpdate) {
           onWorkerUpdate({

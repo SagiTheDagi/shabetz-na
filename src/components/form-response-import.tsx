@@ -147,7 +147,7 @@ function WorkerCombobox({
 export function FormResponseImport() {
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [selectedQuarter, setSelectedQuarter] = useState<string>("");
-  const [shiftDates, setShiftDates] = useState<string[]>([]);
+  const [fetchedShiftDates, setShiftDates] = useState<string[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [rows, setRows] = useState<FormRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -186,10 +186,7 @@ export function FormResponseImport() {
 
   // Fetch shift dates when selected quarter changes
   useEffect(() => {
-    if (!selectedQuarter) {
-      setShiftDates([]);
-      return;
-    }
+    if (!selectedQuarter) return;
     fetch(`/api/shifts?quarter_id=${selectedQuarter}`)
       .then((r) => r.json())
       .then((data: { date: string }[]) => {
@@ -197,6 +194,8 @@ export function FormResponseImport() {
       })
       .catch(() => setShiftDates([]));
   }, [selectedQuarter]);
+
+  const shiftDates = selectedQuarter ? fetchedShiftDates : [];
 
   const activeQuarterObj = useMemo(
     () => quarters.find((q) => q.quarter_id === selectedQuarter),

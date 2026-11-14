@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import type { ShiftDateWithType, WorkerAvailability, Quarter, AvailabilityStatus } from "@/lib/types";
 
@@ -29,18 +29,17 @@ export default function WorkerPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const loadQuarters = useCallback(async () => {
-    const res = await fetch("/api/quarters");
-    const data: Quarter[] = await res.json();
-    setQuarters(data);
-    if (data.length > 0) {
-      setSelectedQuarter(data[0].quarter_id);
-    }
-  }, []);
-
   useEffect(() => {
+    async function loadQuarters() {
+      const res = await fetch("/api/quarters");
+      const data: Quarter[] = await res.json();
+      setQuarters(data);
+      if (data.length > 0) {
+        setSelectedQuarter(data[0].quarter_id);
+      }
+    }
     loadQuarters();
-  }, [loadQuarters]);
+  }, []);
 
   useEffect(() => {
     if (!selectedQuarter) return;

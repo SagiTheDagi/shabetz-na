@@ -1053,19 +1053,18 @@ export default function AssignPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const loadQuarters = useCallback(async () => {
-    const res = await fetch("/api/quarters");
-    const data: Quarter[] = await res.json();
-    setQuarters(data);
-    const saved = getStoredQuarter();
-    if (data.length > 0) {
-      setSelectedQuarter(data.some((q) => q.quarter_id === saved) ? saved! : data[0].quarter_id);
-    }
-  }, []);
-
   useEffect(() => {
+    async function loadQuarters() {
+      const res = await fetch("/api/quarters");
+      const data: Quarter[] = await res.json();
+      setQuarters(data);
+      const saved = getStoredQuarter();
+      if (data.length > 0) {
+        setSelectedQuarter(data.some((q) => q.quarter_id === saved) ? saved! : data[0].quarter_id);
+      }
+    }
     loadQuarters();
-  }, [loadQuarters]);
+  }, []);
 
   useEffect(() => subscribeQuarter(setSelectedQuarter), []);
 
@@ -1080,13 +1079,17 @@ export default function AssignPage() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  // Reset selection when the quarter changes (adjusting state during render, not in an effect).
+  const [prevQuarter, setPrevQuarter] = useState(selectedQuarter);
+  if (selectedQuarter !== prevQuarter) {
+    setPrevQuarter(selectedQuarter);
     if (selectedQuarter) {
       setCalendarMonth(getQuarterStartMonth(selectedQuarter));
       setSelectedShiftId(null);
       setSelectedRole("shift");
+      setWorkers([]);
     }
-  }, [selectedQuarter]);
+  }
 
   const loadShiftsAndAssignments = useCallback(async () => {
     if (!selectedQuarter) return;
@@ -1099,14 +1102,14 @@ export default function AssignPage() {
   }, [selectedQuarter]);
 
   useEffect(() => {
-    loadShiftsAndAssignments();
+    async function run() {
+      await loadShiftsAndAssignments();
+    }
+    run();
   }, [loadShiftsAndAssignments]);
 
   const loadWorkers = useCallback(async () => {
-    if (!selectedShiftId) {
-      setWorkers([]);
-      return;
-    }
+    if (!selectedShiftId) return;
     const res = await fetch(
       `/api/assignments/warnings?shift_date_id=${selectedShiftId}&role=${selectedRole}`
     );
@@ -1120,7 +1123,10 @@ export default function AssignPage() {
   }, [selectedShiftId, selectedRole]);
 
   useEffect(() => {
-    loadWorkers();
+    async function run() {
+      await loadWorkers();
+    }
+    run();
   }, [loadWorkers]);
 
   function handleSelectSlot(shiftId: string, role: "shift" | "reserve") {

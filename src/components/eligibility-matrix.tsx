@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import type { Rank, ShiftType, RankShiftEligibility } from "@/lib/types";
@@ -10,29 +10,28 @@ export function EligibilityMatrix() {
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
   const [matrix, setMatrix] = useState<Map<string, number | null>>(new Map());
 
-  const loadData = useCallback(async () => {
-    const [ranksRes, typesRes, eligRes] = await Promise.all([
-      fetch("/api/ranks"),
-      fetch("/api/shift-types"),
-      fetch("/api/eligibility"),
-    ]);
-    const ranksData: Rank[] = await ranksRes.json();
-    const typesData: ShiftType[] = await typesRes.json();
-    const eligData: RankShiftEligibility[] = await eligRes.json();
-
-    setRanks(ranksData);
-    setShiftTypes(typesData);
-
-    const m = new Map<string, number | null>();
-    for (const e of eligData) {
-      m.set(`${e.rank_id}:${e.shift_type_id}`, e.priority);
-    }
-    setMatrix(m);
-  }, []);
-
   useEffect(() => {
+    async function loadData() {
+      const [ranksRes, typesRes, eligRes] = await Promise.all([
+        fetch("/api/ranks"),
+        fetch("/api/shift-types"),
+        fetch("/api/eligibility"),
+      ]);
+      const ranksData: Rank[] = await ranksRes.json();
+      const typesData: ShiftType[] = await typesRes.json();
+      const eligData: RankShiftEligibility[] = await eligRes.json();
+
+      setRanks(ranksData);
+      setShiftTypes(typesData);
+
+      const m = new Map<string, number | null>();
+      for (const e of eligData) {
+        m.set(`${e.rank_id}:${e.shift_type_id}`, e.priority);
+      }
+      setMatrix(m);
+    }
     loadData();
-  }, [loadData]);
+  }, []);
 
   function getKey(rankId: string, shiftTypeId: string) {
     return `${rankId}:${shiftTypeId}`;

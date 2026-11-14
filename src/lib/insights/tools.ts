@@ -23,6 +23,8 @@ export interface ToolCtx {
   store: ResultStore;
   /** Session the stored results belong to (the admin's worker_id); other sessions can't read them. */
   owner?: string;
+  /** The request's abort signal; run_readonly_sql kills its child process on abort. */
+  signal?: AbortSignal;
 }
 
 export interface QueryOutput {

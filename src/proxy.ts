@@ -77,6 +77,7 @@ export async function proxy(req: NextRequest) {
     "/api/eligibility",
     "/api/export",
     "/api/quarters",
+    "/api/insights",
   ];
 
   for (const prefix of adminApiPrefixes) {

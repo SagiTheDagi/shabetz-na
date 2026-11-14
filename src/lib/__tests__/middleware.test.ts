@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { middleware } from "../../middleware";
+import { proxy } from "../../proxy";
 import { createSession } from "../auth";
 
 const run = async (path: string, who?: "worker" | "admin", method = "GET") => {
@@ -10,7 +10,7 @@ const run = async (path: string, who?: "worker" | "admin", method = "GET") => {
     const t = await createSession({ worker_id: "1", name: "n", is_admin: who === "admin" } as never);
     headers.cookie = `shabetz_session=${t}`;
   }
-  return middleware(new NextRequest(`http://x${path}`, { method, headers }));
+  return proxy(new NextRequest(`http://x${path}`, { method, headers }));
 };
 const passes = (r: Response) => r.headers.get("x-middleware-next") === "1";
 
@@ -35,6 +35,13 @@ describe("middleware: API login is always enforced", () => {
     }
     assert.ok(passes(await run("/api/availability", "worker")));
     assert.ok(passes(await run("/api/justice-chart", "worker")));
+  });
+  it("/api/insights is admin-only", async () => {
+    for (const p of ["/api/insights/chat", "/api/insights/usage", "/api/insights/saved"]) {
+      assert.equal((await run(p)).status, 401, p);
+      assert.equal((await run(p, "worker", p.endsWith("chat") ? "POST" : "GET")).status, 403, p);
+      assert.ok(passes(await run(p, "admin")), p);
+    }
   });
   it("page routes redirect guests; worker can't enter /admin", async () => {
     assert.equal((await run("/worker")).status, 307);

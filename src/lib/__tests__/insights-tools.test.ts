@@ -18,6 +18,7 @@ import {
   quarterCoverage, availabilitySummary, workerHistory, justiceChart, toAnthropicTool, DOMAIN_TOOLS,
   type QueryTool, type ToolCtx,
 } from "../insights/tools";
+import { renderChart, renderTable, MAX_RENDER_ROWS } from "../insights/render";
 
 let db: Database.Database;
 let store: ResultStore;
@@ -321,3 +322,41 @@ describe("domain tools", () => {
   });
 });
 
+// --- T2.5 render tools -----------------------------------------------------------
+
+describe("render tools", () => {
+  const chart = (result_id: string, over: Record<string, unknown> = {}) => ({
+    result_id, kind: "bar", title: "משמרות לעובד",
+    x: { key: "name", label: "עובד", type: "category" },
+    series: [{ key: "shifts", label: "משמרות" }],
+    ...over,
+  });
+
+  it("render_chart joins rows + source; output carries no result_id", async () => {
+    const { result_id } = await run(shiftsPerWorker, { quarter_id: "2026-Q1" });
+    const out = renderChart(chart(result_id), store);
+    assert.equal(out.spec.data.length, 3);
+    assert.deepEqual(out.spec.source, { tool: "shifts_per_worker", args: { quarter_id: "2026-Q1" } });
+    assert.ok(!("result_id" in out.spec));
+    assert.ok(!JSON.stringify(out.spec).includes(result_id));
+    assert.deepEqual(out.forModel, { rendered: true, rows: 3 });
+  });
+
+  it("unknown keys and expired result_id are errors", async () => {
+    const { result_id } = await run(shiftsPerWorker, {});
+    assert.throws(() => renderChart(chart(result_id, { series: [{ key: "nope", label: "x" }] }), store), /Unknown column\(s\): nope/);
+    assert.throws(() => renderChart(chart(result_id, { x: { key: "zz", label: "x", type: "category" } }), store), ToolError);
+    assert.throws(() => renderChart(chart("r_missing"), store), /unknown or expired/);
+    assert.throws(() => renderTable({ result_id, title: "t", columns: [{ key: "bad", label: "b" }] }, store), ToolError);
+    assert.throws(() => renderChart(chart(result_id, { kind: "pie", series: [{ key: "shifts", label: "a" }, { key: "weekend_shifts", label: "b" }] }), store), /pie/);
+  });
+
+  it("render_table defaults to every column and caps rows", () => {
+    const rows = Array.from({ length: MAX_RENDER_ROWS + 5 }, (_, i) => ({ n: i }));
+    const id = store.put({ source: { tool: "x", args: {} }, columns: ["n"], rows });
+    const out = renderTable({ result_id: id, title: "t" }, store);
+    assert.deepEqual(out.spec.columns, [{ key: "n", label: "n" }]);
+    assert.equal(out.spec.data.length, MAX_RENDER_ROWS);
+    assert.equal(out.spec.truncated, true);
+  });
+});

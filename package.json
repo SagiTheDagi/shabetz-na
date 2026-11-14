@@ -12,7 +12,8 @@
     "test:e2e:workers": "node scripts/e2e-workers.mjs",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
-    "db:backup": "tsx --env-file=.env scripts/backup.ts"
+    "db:backup": "tsx --env-file=.env scripts/backup.ts",
+    "eval:insights": "tsx --env-file=.env scripts/eval-insights.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

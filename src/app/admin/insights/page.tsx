@@ -10,14 +10,16 @@
  * text re-renders, and the view follows new output only while the user is
  * already at the bottom.
  */
+import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
-import { ArrowUp, Square, Loader2, RotateCcw, AlertTriangle } from "lucide-react";
+import { ArrowUp, Square, Loader2, RotateCcw, LayoutGrid, AlertTriangle } from "lucide-react";
 import { useSelectedQuarter } from "@/lib/selected-quarter";
 import { useInsightsChat } from "@/lib/insights/use-insights-chat";
 import {
   isChartPart, isTablePart, TOOL_LABELS, type AssistantPart, type AssistantTurn, type ThreadMessage,
 } from "@/lib/insights/chat-client";
-import { InsightCard } from "@/components/insights/insight-card";
+import { InsightCard, type InsightCardContent } from "@/components/insights/insight-card";
+import { SaveViewButton } from "@/components/insights/save-view-dialog";
 import { BudgetIndicator, useInsightsUsage } from "@/components/insights/budget-indicator";
 
 const EXAMPLES = [
@@ -28,13 +30,17 @@ const EXAMPLES = [
 ];
 
 /** Re-renders only when its part object changes (never while later text streams in). */
-const PartCard = memo(function PartCard({ part }: { part: AssistantPart }) {
-  if (isChartPart(part)) return <InsightCard kind="chart" spec={part.result} />;
-  if (isTablePart(part)) return <InsightCard kind="table" spec={part.result} />;
-  return null;
+const PartCard = memo(function PartCard({ part, question }: { part: AssistantPart; question: string }) {
+  const content: InsightCardContent | null = isChartPart(part)
+    ? { kind: "chart", spec: part.result }
+    : isTablePart(part)
+      ? { kind: "table", spec: part.result }
+      : null;
+  if (!content) return null;
+  return <InsightCard {...content} actions={<SaveViewButton content={content} question={question} />} />;
 });
 
-const AssistantMessage = memo(function AssistantMessage({ turn }: { turn: AssistantTurn }) {
+const AssistantMessage = memo(function AssistantMessage({ turn, question }: { turn: AssistantTurn; question: string }) {
   const running = turn.parts.filter((p) => p.type === "tool" && p.status === "running");
   const empty = turn.parts.length === 0 && turn.status === "running";
   return (
@@ -45,7 +51,7 @@ const AssistantMessage = memo(function AssistantMessage({ turn }: { turn: Assist
             <p key={i} className="whitespace-pre-wrap leading-relaxed text-[13.5px] m-0">{p.text}</p>
           ) : null;
         }
-        return <PartCard key={p.id} part={p} />;
+        return <PartCard key={p.id} part={p} question={question} />;
       })}
       {(empty || running.length > 0) && turn.status === "running" && (
         <div className="flex items-center gap-2 text-[12px] nocturne-text-muted">
@@ -77,11 +83,15 @@ const UserMessage = memo(function UserMessage({ text }: { text: string }) {
 function Thread({ thread }: { thread: ThreadMessage[] }) {
   return (
     <>
-      {thread.map((m) =>
+      {thread.map((m, i) =>
         m.role === "user" ? (
           <UserMessage key={m.id} text={m.text} />
         ) : (
-          <AssistantMessage key={m.id} turn={m} />
+          <AssistantMessage
+            key={m.id}
+            turn={m}
+            question={(thread[i - 1] && thread[i - 1].role === "user" ? (thread[i - 1] as { text: string }).text : "")}
+          />
         ),
       )}
     </>
@@ -131,6 +141,9 @@ export default function InsightsPage() {
       <div className="flex items-center gap-3 text-[12px]">
         <BudgetIndicator usage={usage} />
         <div className="mr-auto flex items-center gap-3">
+          <Link href="/admin/insights/saved" className="inline-flex items-center gap-1 nocturne-text-secondary hover:opacity-80">
+            <LayoutGrid className="size-3.5" /> תצוגות שמורות
+          </Link>
           {thread.length > 0 && (
             <button type="button" onClick={reset} className="inline-flex items-center gap-1 nocturne-text-secondary hover:opacity-80">
               <RotateCcw className="size-3.5" /> שיחה חדשה
@@ -144,7 +157,7 @@ export default function InsightsPage() {
           <div className="m-auto flex flex-col items-center gap-4 text-center max-w-md py-8">
             <p className="text-[15px] m-0">שאל שאלה על נתוני השיבוץ</p>
             <p className="text-[12px] nocturne-text-muted m-0">
-              התשובות מבוססות על נתוני המערכת. השיחה אינה נשמרת.
+              התשובות מבוססות על נתוני המערכת. השיחה אינה נשמרת, אך ניתן לשמור גרפים וטבלאות כתצוגות.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLES.map((q) => (

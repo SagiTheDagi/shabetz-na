@@ -356,6 +356,8 @@ describe("render tools", () => {
     const id = store.put({ source: { tool: "x", args: {} }, columns: ["n"], rows });
     const out = renderTable({ result_id: id, title: "t" }, store);
     assert.deepEqual(out.spec.columns, [{ key: "n", label: "n" }]);
+    assert.equal(out.spec.columns_default, true);
+    assert.equal(renderTable({ result_id: id, title: "t", columns: [{ key: "n", label: "N" }] }, store).spec.columns_default, undefined);
     assert.equal(out.spec.data.length, MAX_RENDER_ROWS);
     assert.equal(out.spec.truncated, true);
   });

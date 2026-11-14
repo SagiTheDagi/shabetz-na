@@ -16,10 +16,13 @@ import { setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
 import { MobileTabBar } from "@/components/mobile/tab-bar";
 import type { SessionPayload, Quarter } from "@/lib/types";
 import { useInsightsEnabled } from "@/components/insights/budget-indicator";
+import { INSIGHTS_NAV_LINKS } from "@/components/insights/nav-links";
 
 interface NavSection {
   title: string;
-  items: { href: string; label: string }[];
+  items: readonly { href: string; label: string }[];
+  /** Hidden unless the feature is enabled on the server. */
+  requires?: "insights";
 }
 
 const navSections: NavSection[] = [
@@ -39,6 +42,11 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "ניתוח",
+    items: INSIGHTS_NAV_LINKS,
+    requires: "insights",
+  },
+  {
     title: "הגדרות",
     items: [
       { href: "/admin/settings", label: "הגדרות כלליות" },
@@ -46,13 +54,19 @@ const navSections: NavSection[] = [
   },
 ];
 
-function isNavActive(href: string, pathname: string): boolean {
-  if (href === "/admin") return pathname === "/admin";
-  if (href.includes("?")) {
-    const [path] = href.split("?");
-    return pathname === path || pathname.startsWith(path + "/");
-  }
-  return pathname.startsWith(href);
+/**
+ * Active = the longest nav path that is the pathname or a parent of it, so a
+ * nested item (/admin/insights/saved) doesn't also light up its parent. The
+ * root (/admin) matches only itself.
+ */
+function isNavActive(href: string, pathname: string, allHrefs: string[]): boolean {
+  const matches = (h: string) => {
+    const path = h.split("?")[0];
+    return pathname === path || (path !== "/admin" && pathname.startsWith(path + "/"));
+  };
+  if (!matches(href)) return false;
+  const len = href.split("?")[0].length;
+  return !allHrefs.some((h) => matches(h) && h.split("?")[0].length > len);
 }
 
 function getPageTitle(pathname: string): { title: string; subtitle?: string } {
@@ -61,6 +75,7 @@ function getPageTitle(pathname: string): { title: string; subtitle?: string } {
   if (pathname.startsWith("/admin/workers")) return { title: "עובדים", subtitle: "ניהול רשימת עובדים" };
   if (pathname.startsWith("/admin/eligibility")) return { title: "מטריצת כשירות", subtitle: "הגדרת כשירות לפי דרגה" };
   if (pathname.startsWith("/admin/justice")) return { title: "טבלת צדק", subtitle: "חלוקה הוגנת של משמרות" };
+  if (pathname.startsWith("/admin/insights/saved")) return { title: "תצוגות שמורות", subtitle: "תובנות שנשמרו מהעוזר" };
   if (pathname.startsWith("/admin/insights")) return { title: "עוזר תובנות", subtitle: "שאלות על נתוני השיבוץ" };
   if (pathname.startsWith("/admin/more")) return { title: "עוד" };
   if (pathname.startsWith("/admin/settings")) return { title: "הגדרות", subtitle: "ניהול המערכת" };
@@ -107,18 +122,8 @@ export default function AdminLayout({
       .catch(() => {});
   }, [router]);
 
-  const sections: NavSection[] = insightsEnabled
-    ? [
-        ...navSections.slice(0, 2),
-        {
-          title: "ניתוח",
-          items: [
-            { href: "/admin/insights", label: "עוזר תובנות" },
-          ],
-        },
-        ...navSections.slice(2),
-      ]
-    : navSections;
+  const sections = navSections.filter((s) => s.requires !== "insights" || insightsEnabled);
+  const navHrefs = sections.flatMap((s) => s.items.map((i) => i.href));
 
   useEffect(() => subscribeQuarter(setCurrentQuarter), []);
 
@@ -155,7 +160,7 @@ export default function AdminLayout({
               {section.title}
             </div>
             {section.items.map((item) => {
-              const active = isNavActive(item.href, pathname);
+              const active = isNavActive(item.href, pathname, navHrefs);
               return (
                 <Link
                   key={item.href}

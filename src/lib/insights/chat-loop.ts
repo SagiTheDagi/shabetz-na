@@ -14,8 +14,8 @@ import { BUDGET_EXCEEDED_MESSAGE } from "./budget";
 import { estimateCost, estimateTextTokens, INSIGHTS_MODEL } from "./pricing";
 import { buildSystem } from "./prompt";
 import { ToolError } from "./errors";
-import { DOMAIN_TOOLS, executeQueryTool, toAnthropicTool, type QueryTool, type ToolCtx } from "./tools";
-import { runReadonlySql } from "./sql-runner";
+import { executeQueryTool, toAnthropicTool, type QueryTool, type ToolCtx } from "./tools";
+import { QUERY_TOOLS, QUERY_TOOL_MAP } from "./query-tools";
 import { RENDER_TOOLS, renderChart, renderTable } from "./render";
 
 export const MAX_ITERATIONS = 8;
@@ -41,8 +41,6 @@ export type ChatEvent =
   | { type: "error"; message: string }
   | { type: "done" };
 
-const QUERY_TOOLS: QueryTool[] = [...DOMAIN_TOOLS, runReadonlySql];
-const QUERY_TOOL_MAP = new Map(QUERY_TOOLS.map((t) => [t.name, t]));
 
 /** Static, deterministic tool list (part of the cached prefix). */
 export const TOOL_DEFINITIONS: Anthropic.Tool[] = [...QUERY_TOOLS, ...RENDER_TOOLS].map((t) =>

@@ -174,9 +174,9 @@ CREATE TABLE IF NOT EXISTS InsightUsage (
 ## APIs
 - `POST /api/insights/chat`: streamed chat (budget-reserved).
 - `GET /api/insights/usage`: the current month's cost and the cap.
-- `GET/POST/DELETE /api/insights/saved`: shared list; any admin can create or delete. POST stores `schema_version = AI_VIEWS_VERSION`.
+- `GET/POST/DELETE /api/insights/saved`: shared list; any admin can create or delete. POST runs the source once to check the spec renders, then stores `schema_version = AI_VIEWS_VERSION` (informational only).
 - `GET /api/insights/saved/[id]/data`: re-runs the stored source **without Claude**, so it's free and the data is current.
-  - If `schema_version` doesn't match `AI_VIEWS_VERSION`, return 409 with the Hebrew error "התצוגה נשמרה לפני שינוי מבנה הנתונים, יש ליצור אותה מחדש"; the grid shows it as outdated.
+  - If the view no longer matches the data (unknown tool, args that no longer parse, spec keys missing from the re-run's columns, or a corrupt row), return 409 with the Hebrew error "התצוגה נשמרה לפני שינוי מבנה הנתונים, יש ליצור אותה מחדש"; the grid shows it as outdated.
   - A `run_readonly_sql` source goes through `guardSql` and the worker timeout again on every re-run; the stored SQL is never trusted.
 - `/admin/insights/saved`: a grid of saved views (mini dashboard).
 
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS InsightUsage (
    - Budget: pricing (both tiers, cache tokens), reservation, usage upsert, plus tests: cost formula, and two concurrent reservations near the cap.
    - **Eval:** `scripts/eval-insights.mjs` runs 15–20 real Hebrew questions against seeded data and compares the numbers in the tool results and final answer to expected values. Run it at `medium` and `low` effort, pick the cheapest that passes, and record the result here. Re-run it after prompt or tool changes.
 3. **UI:** `/admin/insights`, assistant-ui `LocalRuntime`, Recharts renderer (bar/line/pie/stacked), table renderer, budget indicator, nav entry.
-4. **Saved views:** APIs, `schema_version` check, shared grid page, re-run without the LLM.
+4. **Saved views:** APIs, per-view staleness check, shared grid page, re-run without the LLM.
 5. **Polish:** calendar heatmap, CSV export, pseudonymize flag (stable HMAC aliases, free-text columns dropped, map-back on joined text, plus a test that a worker keeps the same alias across two requests), mobile pass, e2e script (`scripts/e2e-insights.mjs`).
 
 ## Open items

@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { ToolError } from "./errors";
-import type { ResultStore, Row, ResultSource } from "./result-store";
+import type { ResultStore, Row, ResultSource, StoredResult } from "./result-store";
 
 export const MAX_RENDER_ROWS = 500;
 
@@ -46,6 +46,8 @@ export type ChartSpec = Omit<ChartSpecInput, "result_id"> & {
 export type TableSpec = {
   title: string;
   columns: { key: string; label: string }[];
+  /** No columns were chosen: they are every result column. Saving then omits them, so re-runs follow the result. */
+  columns_default?: true;
   data: Row[];
   source: ResultSource;
   truncated?: boolean;
@@ -77,10 +79,16 @@ function parse<T>(schema: z.ZodType<T>, raw: unknown, name: string): T {
   return p.data;
 }
 
+type ResultRows = Pick<StoredResult, "source" | "columns" | "rows">;
+
 /** Join rows into a chart spec. Pure given the store. */
 export function renderChart(raw: unknown, store: ResultStore, owner = ""): RenderOutput<ChartSpec> {
   const { result_id, ...rest } = parse(chartSpecInputSchema, raw, "render_chart");
-  const result = lookup(store, result_id, owner);
+  return chartFromResult(rest, lookup(store, result_id, owner));
+}
+
+/** Join a result's rows into an already-parsed chart spec (saved-view re-runs skip the store). */
+export function chartFromResult(rest: Omit<ChartSpecInput, "result_id">, result: ResultRows): RenderOutput<ChartSpec> {
   checkKeys([rest.x.key, ...rest.series.map((s) => s.key)], result.columns);
   if (rest.kind === "pie" && rest.series.length !== 1) throw new ToolError("A pie chart takes exactly one series.");
   const truncated = result.rows.length > MAX_RENDER_ROWS;
@@ -93,14 +101,26 @@ export function renderChart(raw: unknown, store: ResultStore, owner = ""): Rende
 
 /** Join rows into a table spec. Columns default to every result column. */
 export function renderTable(raw: unknown, store: ResultStore, owner = ""): RenderOutput<TableSpec> {
-  const { result_id, title, columns } = parse(tableSpecInputSchema, raw, "render_table");
-  const result = lookup(store, result_id, owner);
-  const cols = columns && columns.length ? columns : result.columns.map((c) => ({ key: c, label: c }));
+  const { result_id, ...rest } = parse(tableSpecInputSchema, raw, "render_table");
+  return tableFromResult(rest, lookup(store, result_id, owner));
+}
+
+/** Join a result's rows into an already-parsed table spec (saved-view re-runs skip the store). */
+export function tableFromResult({ title, columns }: Omit<TableSpecInput, "result_id">, result: ResultRows): RenderOutput<TableSpec> {
+  const chosen = !!columns?.length;
+  const cols = chosen ? columns! : result.columns.map((c) => ({ key: c, label: c }));
   checkKeys(cols.map((c) => c.key), result.columns);
   const truncated = result.rows.length > MAX_RENDER_ROWS;
   const data = result.rows.slice(0, MAX_RENDER_ROWS);
   return {
-    spec: { title, columns: cols, data, source: result.source, ...(truncated ? { truncated } : {}) },
+    spec: {
+      title,
+      columns: cols,
+      ...(chosen ? {} : { columns_default: true as const }),
+      data,
+      source: result.source,
+      ...(truncated ? { truncated } : {}),
+    },
     forModel: { rendered: true, rows: data.length, ...(truncated ? { truncated } : {}) },
   };
 }

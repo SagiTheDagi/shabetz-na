@@ -6,17 +6,17 @@ import type { ChartSpec, TableSpec } from "@/lib/insights/render";
 import { InsightChart } from "./insight-chart";
 import { InsightTable } from "./insight-table";
 
+export type InsightCardContent = { kind: "chart"; spec: ChartSpec } | { kind: "table"; spec: TableSpec };
+
 export function InsightCard({
-  kind,
-  spec,
   actions,
   badge,
-}: {
-  kind: "chart" | "table";
-  spec: ChartSpec | TableSpec;
+  ...content
+}: InsightCardContent & {
   actions?: ReactNode;
   badge?: ReactNode;
 }) {
+  const { spec } = content;
   return (
     <div className="rounded-xl border border-white/5 nocturne-surface p-3 md:p-4 flex flex-col gap-3 min-w-0">
       <div className="flex items-center gap-2">
@@ -24,8 +24,8 @@ export function InsightCard({
         {badge}
         <div className="mr-auto flex items-center gap-3">{actions}</div>
       </div>
-      {kind === "chart" ? <InsightChart spec={spec as ChartSpec} /> : <InsightTable spec={spec as TableSpec} />}
-      {kind === "chart" && (spec as ChartSpec).truncated && (
+      {content.kind === "chart" ? <InsightChart spec={content.spec} /> : <InsightTable spec={content.spec} />}
+      {content.kind === "chart" && content.spec.truncated && (
         <p className="text-[11px] nocturne-text-muted">מוצגות 500 השורות הראשונות בלבד.</p>
       )}
     </div>

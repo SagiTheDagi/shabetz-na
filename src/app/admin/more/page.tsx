@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar } from "@/components/mobile/avatar";
 import type { SessionPayload } from "@/lib/types";
 import { useInsightsEnabled } from "@/components/insights/budget-indicator";
+import { INSIGHTS_NAV_LINKS } from "@/components/insights/nav-links";
 
 const links = [
   { href: "/admin/settings?tab=dates", label: "תאריכי משמרות" },
@@ -29,7 +30,7 @@ export default function MorePage() {
   }, []);
 
   const allLinks = insightsEnabled
-    ? [{ href: "/admin/insights", label: "עוזר תובנות" }, ...links]
+    ? [...INSIGHTS_NAV_LINKS, ...links]
     : links;
 
   async function logout() {

@@ -27,6 +27,9 @@ export interface ToolCtx {
   signal?: AbortSignal;
 }
 
+/** What a query tool's run() may use: no store, so saved-view re-runs need none. */
+export type RunCtx = Pick<ToolCtx, "db" | "signal">;
+
 export interface QueryOutput {
   columns: string[];
   rows: Row[];
@@ -38,7 +41,7 @@ export interface QueryTool<S extends z.ZodObject = z.ZodObject> {
   name: string;
   description: string;
   schema: S;
-  run(args: z.infer<S>, ctx: ToolCtx): QueryOutput | Promise<QueryOutput>;
+  run(args: z.infer<S>, ctx: RunCtx): QueryOutput | Promise<QueryOutput>;
 }
 
 export const PREVIEW_ROWS = 20;
@@ -355,11 +358,6 @@ export function parseArgs(tool: QueryTool, raw: unknown): Record<string, unknown
     throw new ToolError(`Invalid input for ${tool.name}: ${z.prettifyError(parsed.error)}`);
   }
   return parsed.data;
-}
-
-/** Run a query tool (no storing). Used directly by saved-view re-runs. */
-export async function runQueryTool(tool: QueryTool, rawArgs: unknown, ctx: ToolCtx): Promise<QueryOutput> {
-  return tool.run(parseArgs(tool, rawArgs), ctx);
 }
 
 /** Run a query tool, store its rows, and return what the model sees. */

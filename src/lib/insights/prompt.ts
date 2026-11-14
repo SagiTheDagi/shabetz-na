@@ -86,13 +86,17 @@ const obj = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, u
 export function summarizeToolPart(p: Extract<ClientPart, { type: "tool" }>): string {
   const args = obj(p.args);
   const result = obj(p.result);
+  // "failed" / "cancelled" (stopped by the user): nothing was shown or stored.
+  const error = str(result.error);
   if (p.toolName === "render_chart" || p.toolName === "render_table") {
     const kind = p.toolName === "render_chart" ? "chart" : "table";
+    if (error) return `[${kind} ${error}, not shown: ${str(args.title) ?? ""}, result_id=${str(args.result_id) ?? "?"}]`;
     const rows = typeof result.rows === "number" ? result.rows : Array.isArray(result.data) ? result.data.length : "?";
     return `[${kind}: ${str(args.title) ?? ""}, result_id=${str(args.result_id) ?? "?"}, ${rows} rows]`;
   }
   const { sql, ...rest } = args;
   const argText = sql !== undefined ? `sql=${JSON.stringify(sql)}` : JSON.stringify(rest);
+  if (error) return `[query ${error}, no result: ${p.toolName}(${argText})]`;
   const id = str(result.result_id);
   const cols = Array.isArray(result.columns) ? ` columns=${(result.columns as unknown[]).join(",")}` : "";
   const count = typeof result.row_count === "number" ? `, ${result.row_count} rows` : "";

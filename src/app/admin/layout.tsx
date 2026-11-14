@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { setStoredQuarter, subscribeQuarter } from "@/lib/selected-quarter";
 import { MobileTabBar } from "@/components/mobile/tab-bar";
 import type { SessionPayload, Quarter } from "@/lib/types";
+import { useInsightsEnabled } from "@/components/insights/budget-indicator";
 
 interface NavSection {
   title: string;
@@ -60,6 +61,7 @@ function getPageTitle(pathname: string): { title: string; subtitle?: string } {
   if (pathname.startsWith("/admin/workers")) return { title: "עובדים", subtitle: "ניהול רשימת עובדים" };
   if (pathname.startsWith("/admin/eligibility")) return { title: "מטריצת כשירות", subtitle: "הגדרת כשירות לפי דרגה" };
   if (pathname.startsWith("/admin/justice")) return { title: "טבלת צדק", subtitle: "חלוקה הוגנת של משמרות" };
+  if (pathname.startsWith("/admin/insights")) return { title: "עוזר תובנות", subtitle: "שאלות על נתוני השיבוץ" };
   if (pathname.startsWith("/admin/more")) return { title: "עוד" };
   if (pathname.startsWith("/admin/settings")) return { title: "הגדרות", subtitle: "ניהול המערכת" };
   return { title: "ניהול" };
@@ -75,6 +77,7 @@ export default function AdminLayout({
   const [user, setUser] = useState<SessionPayload | null>(null);
   const [quarters, setQuarters] = useState<Quarter[]>([]);
   const [currentQuarter, setCurrentQuarter] = useState<string>("");
+  const insightsEnabled = useInsightsEnabled(); // the assistant is optional: nav entry only when the server has a key
 
   useEffect(() => {
     fetch("/api/auth")
@@ -103,6 +106,19 @@ export default function AdminLayout({
       })
       .catch(() => {});
   }, [router]);
+
+  const sections: NavSection[] = insightsEnabled
+    ? [
+        ...navSections.slice(0, 2),
+        {
+          title: "ניתוח",
+          items: [
+            { href: "/admin/insights", label: "עוזר תובנות" },
+          ],
+        },
+        ...navSections.slice(2),
+      ]
+    : navSections;
 
   useEffect(() => subscribeQuarter(setCurrentQuarter), []);
 
@@ -133,7 +149,7 @@ export default function AdminLayout({
         </div>
 
         {/* Navigation sections */}
-        {navSections.map((section, idx) => (
+        {sections.map((section, idx) => (
           <div key={idx}>
             <div className="text-[10px] px-2 pt-2.5 pb-1 tracking-widest nocturne-text-muted">
               {section.title}

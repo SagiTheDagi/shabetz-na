@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar } from "@/components/mobile/avatar";
 import type { SessionPayload } from "@/lib/types";
+import { useInsightsEnabled } from "@/components/insights/budget-indicator";
 
 const links = [
   { href: "/admin/settings?tab=dates", label: "תאריכי משמרות" },
@@ -18,6 +19,7 @@ const links = [
 export default function MorePage() {
   const router = useRouter();
   const [user, setUser] = useState<SessionPayload | null>(null);
+  const insightsEnabled = useInsightsEnabled();
 
   useEffect(() => {
     fetch("/api/auth")
@@ -25,6 +27,10 @@ export default function MorePage() {
       .then((d) => !d.error && setUser(d))
       .catch(() => {});
   }, []);
+
+  const allLinks = insightsEnabled
+    ? [{ href: "/admin/insights", label: "עוזר תובנות" }, ...links]
+    : links;
 
   async function logout() {
     await fetch("/api/auth", { method: "DELETE" });
@@ -44,7 +50,7 @@ export default function MorePage() {
         </span>
       </div>
       <div className="rounded-[14px] bg-[#1f2130] flex flex-col">
-        {links.map((l) => (
+        {allLinks.map((l) => (
           <Link
             key={l.href}
             href={l.href}

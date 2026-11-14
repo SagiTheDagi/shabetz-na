@@ -17,7 +17,8 @@ function isActive(href: string, pathname: string) {
       pathname.startsWith("/admin/more") ||
       pathname.startsWith("/admin/settings") ||
       pathname.startsWith("/admin/eligibility") ||
-      pathname.startsWith("/admin/justice")
+      pathname.startsWith("/admin/justice") ||
+      pathname.startsWith("/admin/insights")
     );
   }
   return pathname.startsWith(href);

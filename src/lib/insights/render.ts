@@ -22,7 +22,8 @@ export const chartSpecInputSchema = z.strictObject({
     label: z.string(),
     type: z.enum(["category", "date", "number"]),
   }),
-  series: z.array(z.strictObject({ key: z.string(), label: z.string() })).min(1),
+  // 8 = the client's color palette; more series would repeat colors.
+  series: z.array(z.strictObject({ key: z.string(), label: z.string() })).min(1).max(8),
 });
 
 export const tableSpecInputSchema = z.strictObject({
